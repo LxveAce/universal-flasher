@@ -230,7 +230,7 @@ def _decompress_xz(src: str, dest: str, on_line: Line,
             if not chunk:
                 break
             fout.write(chunk)
-            read_total += _CHUNK
+            read_total += len(chunk)
             if on_progress and src_size > 0:
                 # compressed-read position is approximate; clamp to 1.0
                 on_progress(min(read_total / (src_size * 3), 1.0))
@@ -250,7 +250,7 @@ def _decompress_gz(src: str, dest: str, on_line: Line,
             if not chunk:
                 break
             fout.write(chunk)
-            read_total += _CHUNK
+            read_total += len(chunk)
             if on_progress and src_size > 0:
                 on_progress(min(read_total / (src_size * 3), 1.0))
     on_line(f"[decompress] -> {dest} ({os.path.getsize(dest)} bytes)")
@@ -510,7 +510,8 @@ def _write_dd(img_path: str, device: str, on_line: Line,
 
     on_line(f"[sd] writing {os.path.basename(img_path)} ({img_size} bytes) to {raw_dev}...")
     # dd with status=progress for user feedback; we also track ourselves via file position
-    argv = ["dd", f"if={img_path}", f"of={raw_dev}", "bs=4M", "conv=fsync", "status=progress"]
+    bs = "4m" if platform.system() == "Darwin" else "4M"
+    argv = ["dd", f"if={img_path}", f"of={raw_dev}", f"bs={bs}", "conv=fsync", "status=progress"]
     # dd requires root on Linux/macOS
     if hasattr(os, "geteuid") and os.geteuid() != 0:
         argv = ["sudo"] + argv

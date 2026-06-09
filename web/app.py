@@ -291,6 +291,9 @@ def on_flash_detect(data):
     if not port:
         emit("flash_status", {"error": "No port specified"})
         return
+    if _flash_busy:
+        emit("flash_status", {"error": "Cannot detect chip while a flash/erase is in progress."})
+        return
     try:
         chip = flasher.detect_chip(port, _flash_line)
         emit("flash_status", {"chip": chip})

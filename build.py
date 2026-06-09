@@ -37,6 +37,7 @@ HIDDEN_IMPORTS = [
     "uf_core.batch",
     "uf_core.backup",
     "uf_core.health",
+    "uf_core.uihelp",
     "serial",
     "serial.tools",
     "serial.tools.list_ports",
