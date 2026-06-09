@@ -41,6 +41,7 @@ class GenericSerialController:
         self._running = False
         self._subs: List[Line] = []
         self._write_lock = threading.Lock()
+        self._subs_lock = threading.Lock()
         self._buffer: List[str] = []
         self._buffer_lock = threading.Lock()
 
@@ -72,14 +73,17 @@ class GenericSerialController:
         return self._running and self.ser is not None
 
     def subscribe(self, cb: Line):
-        self._subs.append(cb)
+        with self._subs_lock:
+            self._subs.append(cb)
 
     def _emit(self, line: str):
         with self._buffer_lock:
             self._buffer.append(line)
             if len(self._buffer) > 500:
                 self._buffer.pop(0)
-        for cb in list(self._subs):
+        with self._subs_lock:
+            subs = list(self._subs)
+        for cb in subs:
             try:
                 cb(line)
             except Exception:

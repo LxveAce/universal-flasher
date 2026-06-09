@@ -55,7 +55,8 @@ class BatchFlasher:
     def flash_sequential(self, jobs: List[FlashJob]) -> List[FlashResult]:
         self._running = True
         self._cancelled = False
-        self._results.clear()
+        with self._lock:
+            self._results.clear()
 
         from . import flasher
 
@@ -78,7 +79,8 @@ class BatchFlasher:
     def flash_parallel(self, jobs: List[FlashJob]) -> List[FlashResult]:
         self._running = True
         self._cancelled = False
-        self._results.clear()
+        with self._lock:
+            self._results.clear()
 
         from . import flasher
 

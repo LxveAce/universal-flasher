@@ -99,11 +99,10 @@ class PluginProfile(FirmwareProfile):
 
     def latest_release(self) -> Tuple[str, List[Dict]]:
         """Fetch latest release from the plugin's GitHub repo."""
-        import urllib.request
+        from .flasher import _http_get, _require_allowed_url
         api_url = f"https://api.github.com/repos/{self.repo}/releases/latest"
-        req = urllib.request.Request(api_url, headers={"User-Agent": "universal-flasher"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            release = json.loads(resp.read().decode("utf-8"))
+        _require_allowed_url(api_url)
+        release = json.loads(_http_get(api_url).decode("utf-8"))
 
         tag = release.get("tag_name", "latest")
         assets: List[Dict] = []
