@@ -1,0 +1,95 @@
+# Suicide Marauder — FORK integration patch for ESP32 Marauder
+#
+# Target file : esp32_marauder/esp32_marauder.ino
+# Upstream    : github.com/justcallmekoko/ESP32Marauder (shallow clone, master)
+# Contract    : docs/SPEC.md §1 (FORK hook) and §6 (BootGate state machine)
+#
+# WHAT THIS DOES (two edits, one file):
+#   1. Adds `#include "esp_system.h"` (for esp_restart) and `#include "bootgate/BootGate.h"`
+#      right after Marauder's `#include "lang_var.h"`.
+#   2. Inserts a FAIL-CLOSED gate call inside setup(), AFTER `display_obj.RunSetup()` and
+#      immediately BEFORE `settings_obj.begin();`:
+#          if (suicide::BootGate::run() != suicide::GATE_PASS) { esp_restart(); }
+#      The return value is checked: any non-PASS result (including GATE_TRIGGERED, or an
+#      unexpected return from a wipe path) reboots instead of falling through into Marauder.
+#
+# ANCHORS, NOT LINE NUMBERS. Upstream re-numbers setup() every release, so this patch is written
+# to be line-number tolerant. The hunk context below quotes the REAL surrounding lines that were
+# present in the inspected source so a fuzzy apply still lands:
+#
+#     patch -p1 --fuzz=3 < firmware/integration/esp32marauder.ino.patch
+#
+# If a hunk rejects, apply by hand using these two anchors (see firmware/integration/INTEGRATION.md §2):
+#   * Include anchor : the line `#include "lang_var.h"` (last of the settings/CLI/lang include trio).
+#   * Call anchor    : the `#ifdef HAS_SCREEN / display_obj.RunSetup() / #endif` block, then the
+#                      next `settings_obj.begin();` — insert the gate call on the line just before it.
+#
+# Owner-only DEFENSIVE anti-forensic layer. An unprovisioned OR master-disarmed board takes the
+# GATE_PASS path and behaves exactly like stock Marauder (it can never wipe — SPEC §6 step 2/4).
+# A real (non-SAFE) trigger does not return; in SUICIDE_SAFE_MODE the gate only logs and returns
+# GATE_PASS. The hook is FAIL-CLOSED: it checks run()'s return and only continues into Marauder on
+# GATE_PASS. Any other result (GATE_TRIGGERED, or an unexpected early return out of a wipe path
+# that should not have returned) reboots via esp_restart() instead of leaking into the UI — so the
+# gate cannot be skipped just because a destruct primitive returned instead of never-returning.
+--- a/esp32_marauder/esp32_marauder.ino
++++ b/esp32_marauder/esp32_marauder.ino
+@@
+ #include "settings.h"
+ #include "CommandLine.h"
+ #include "lang_var.h"
++
++// === Suicide Marauder boot-gate (FORK variant). Owner-only DEFENSIVE duress layer. SPEC §1. ===
++// Compiled from firmware/bootgate (added to the sketch as bootgate/ — see INTEGRATION.md §1).
++// If you flattened the sources into the sketch root instead, change this to "BootGate.h".
++#include "esp_system.h"        // esp_restart() — the fail-closed reboot in the gate hook below
++#include "bootgate/BootGate.h"
+
+ #ifdef HAS_BATTERY
+   #include "BatteryInterface.h"
+ #endif
+@@
+   #ifdef HAS_SCREEN
+     display_obj.RunSetup();
+     display_obj.tft.setTextColor(TFT_WHITE, TFT_BLACK);
+   #endif
+@@
+   #ifdef HAS_SCREEN
+     // Do some stealth mode stuff
+     #ifdef HAS_BUTTONS
+       if (c_btn.justPressed()) {
+         display_obj.headless_mode = true;
+
+         backlightOff();
+       }
+     #endif
+   #endif
+
++  // === Suicide Marauder boot-gate call (FORK). SPEC §1, §6. FAIL-CLOSED. ===
++  // Placed AFTER display_obj.RunSetup() (display + backlight are up, so the touch / mini-kb /
++  // Cardputer password UI can draw) and BEFORE settings_obj.begin() — i.e. before any persisted
++  // setting, SPIFFS, SD mount, WiFi, or CLI subsystem is initialized.
++  //
++  // Invariants enforced inside run() (cannot be bypassed from here):
++  //   * unprovisioned (no guardcfg) -> GATE_PASS, never wipes.
++  //   * master-disarmed (sgate.armed==0, the default) -> GATE_PASS, never wipes.
++  //   * correct password -> GATE_PASS, resets the attempt counter, never wipes.
++  //   * armed + dead-man line not armed -> SelfDestruct before the password is even asked.
++  //   * wrong attempts reach max_att (armed) -> SelfDestruct.
++  //
++  // A real (non-SAFE) trigger NEVER returns. Under -DSUICIDE_SAFE_MODE the whole chain only LOGS
++  // a simulated wipe against a scratch partition and returns GATE_PASS. Build SAFE_MODE first.
++  //
++  // FAIL-CLOSED: only GATE_PASS is allowed to fall through into Marauder. Any other result —
++  // GATE_TRIGGERED, or an unexpected return out of a destruct path that was supposed to never
++  // return — reboots via esp_restart() instead of leaking into the UI. We must NOT discard run()'s
++  // result: doing so would mean only a never-returning SelfDestruct could stop a boot, and a wipe
++  // primitive that returned (best-effort erase, brick disabled, partial failure) would silently
++  // hand control to the un-gated app. esp_restart() re-enters setup(); on the next pass the gate
++  // re-evaluates from a clean state (e.g. att_ct already at max -> it triggers again).
++  if (suicide::BootGate::run() != suicide::GATE_PASS) {
++    esp_restart();   // never returns; re-runs the gate fail-closed on reboot
++  }
++
+   settings_obj.begin();
+
+   const char* type = settings_obj.getSettingType("ChanHop");

@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Flasher v{{ version }}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+:root {
+  --bg: #0b0f0a;
+  --bg2: #05080a;
+  --fg: #c8f7c5;
+  --accent: #39ff14;
+  --danger: #ff4d4d;
+  --muted: #4a6a4a;
+  --border: #1a2e1a;
+  --hover: #112211;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--fg); font-family:'Consolas','Fira Code','Courier New',monospace; font-size:13px; height:100vh; display:flex; flex-direction:column; }
+a { color:var(--accent); }
+
+/* ── toolbar ── */
+#toolbar { display:flex; align-items:center; gap:8px; padding:6px 12px; background:var(--bg2); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+#toolbar select, #toolbar input, #toolbar button { font-family:inherit; font-size:12px; background:var(--bg); color:var(--fg); border:1px solid var(--border); padding:4px 8px; border-radius:3px; }
+#toolbar button { cursor:pointer; }
+#toolbar button:hover { background:var(--hover); border-color:var(--accent); }
+#toolbar .spacer { flex:1; }
+#status-dot { width:10px; height:10px; border-radius:50%; background:#555; display:inline-block; }
+#status-dot.on { background:var(--accent); box-shadow:0 0 6px var(--accent); }
+#btn-stop { background:#2a0a0a; color:var(--danger); border-color:var(--danger); font-weight:bold; }
+#btn-stop:hover { background:#3a1515; }
+
+/* ── layout ── */
+#main { display:flex; flex:1; overflow:hidden; }
+#sidebar { width:240px; min-width:200px; overflow-y:auto; border-right:1px solid var(--border); background:var(--bg2); padding:4px; }
+#content { flex:1; display:flex; flex-direction:column; }
+
+/* ── tabs ── */
+#tabs { display:flex; border-bottom:1px solid var(--border); background:var(--bg2); }
+.tab { padding:6px 16px; cursor:pointer; border-bottom:2px solid transparent; color:var(--muted); }
+.tab:hover { color:var(--fg); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+/* ── tab panes ── */
+.pane { flex:1; display:none; overflow:auto; }
+.pane.active { display:flex; flex-direction:column; }
+
+/* ── console ── */
+#console { flex:1; padding:8px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; background:var(--bg2); font-size:12px; line-height:1.5; }
+#console .cmd { color:var(--accent); }
+#console .err { color:var(--danger); }
+
+/* ── raw input ── */
+#input-bar { display:flex; border-top:1px solid var(--border); background:var(--bg2); }
+#raw-input { flex:1; background:var(--bg); color:var(--fg); border:none; padding:8px 12px; font-family:inherit; font-size:13px; outline:none; }
+#btn-send { background:var(--bg); color:var(--accent); border:none; border-left:1px solid var(--border); padding:8px 16px; cursor:pointer; font-family:inherit; }
+#btn-send:hover { background:var(--hover); }
+
+/* ── tables ── */
+table.data { width:100%; border-collapse:collapse; }
+table.data th { background:var(--bg); color:var(--accent); text-align:left; padding:6px 10px; border-bottom:1px solid var(--border); position:sticky; top:0; font-weight:normal; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+table.data td { padding:5px 10px; border-bottom:1px solid var(--border); font-size:12px; }
+table.data tr:hover { background:var(--hover); }
+table.data td.rssi { font-weight:bold; }
+
+/* ── sidebar commands ── */
+.cat-label { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); padding:8px 8px 4px; margin-top:4px; }
+.cmd-btn { display:block; width:100%; text-align:left; padding:5px 8px; margin:1px 0; background:transparent; color:var(--fg); border:1px solid transparent; border-radius:3px; cursor:pointer; font-family:inherit; font-size:12px; }
+.cmd-btn:hover { background:var(--hover); border-color:var(--border); }
+.cmd-btn.danger { color:var(--danger); }
+.cmd-btn.danger:hover { border-color:var(--danger); }
+
+/* ── modal ── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
+.modal-overlay.show { display:flex; }
+.modal { background:var(--bg); border:1px solid var(--accent); border-radius:6px; padding:20px; min-width:340px; max-width:500px; max-height:80vh; overflow-y:auto; }
+.modal h3 { color:var(--accent); margin-bottom:12px; font-size:14px; }
+.modal label { display:block; color:var(--muted); font-size:11px; margin:8px 0 3px; }
+.modal input, .modal select { width:100%; background:var(--bg2); color:var(--fg); border:1px solid var(--border); padding:6px 8px; border-radius:3px; font-family:inherit; font-size:12px; }
+.modal-actions { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; }
+.modal-actions button { padding:6px 16px; border-radius:3px; cursor:pointer; font-family:inherit; border:1px solid var(--border); background:var(--bg2); color:var(--fg); }
+.modal-actions button.primary { background:var(--accent); color:var(--bg); border-color:var(--accent); font-weight:bold; }
+.modal-actions button.primary:hover { opacity:0.9; }
+.modal-actions button:hover { border-color:var(--accent); }
+
+/* ── flash modal extras ── */
+.flash-row { display:flex; gap:8px; align-items:center; margin-top:2px; }
+.flash-row input[type=text], .flash-row input:not([type]) { flex:1; }
+.flash-row button { width:auto; white-space:nowrap; background:var(--bg2); color:var(--fg); border:1px solid var(--border); padding:6px 10px; border-radius:3px; cursor:pointer; font-family:inherit; font-size:12px; }
+.flash-row button:hover { border-color:var(--accent); }
+.modal label.inline { display:inline-flex; align-items:center; gap:5px; color:var(--fg); width:auto; margin:0; cursor:pointer; }
+.modal label.inline input { width:auto; }
+#flash-erase-btn { color:var(--danger); border-color:var(--danger); }
+#flash-erase-btn:hover { background:#2a0a0a; }
+.flash-danger { color:var(--danger); font-weight:bold; font-size:11px; margin:8px 0; line-height:1.4; }
+.flash-note { color:var(--muted); font-size:11px; margin:6px 0; line-height:1.4; }
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width:8px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+::-webkit-scrollbar-thumb:hover { background:var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ── TOOLBAR ── -->
+<div id="toolbar">
+  <span id="status-dot" title="Connection status: green when connected to the board."></span>
+  <select id="port-select" title="Serial port the Marauder is on (e.g. COM5 or /dev/ttyUSB0). Pick from the list or leave on auto-detect."><option value="">Select port...</option></select>
+  <button id="btn-refresh" title="Rescan for connected serial ports.">&#x21bb;</button>
+  <button id="btn-connect" title="Open (or close) the serial session to the selected port.">Connect</button>
+  <label style="color:var(--muted);font-size:11px;display:flex;align-items:center;gap:4px;"
+         title="While scanning, auto-pull 'list -a' so the AP/Station tables fill themselves.">
+    <input type="checkbox" id="chk-autolist" checked title="While scanning, auto-pull 'list -a' so the tables fill themselves."> Auto-list
+  </label>
+  <label style="color:var(--muted);font-size:11px;display:flex;align-items:center;gap:4px;"
+         title="Toggle capture logging: write the serial stream and periodic AP/Station snapshots to the log folder.">
+    <input type="checkbox" id="chk-log" title="Toggle capture logging: write the serial stream + periodic snapshots to the log folder."> Log
+  </label>
+  <span class="spacer"></span>
+  <button id="btn-flash" title="Open the firmware flasher: download or pick a build (or a Suicide bundle) and write it to the board.">&#x26a1; Flash</button>
+  <button id="btn-clear" title="Clear the console (Ctrl+L).">Clear</button>
+  <button id="btn-stop" title="Send 'stopscan' and halt auto-listing (Ctrl+.). Stops the current attack/scan.">STOP</button>
+</div>
+
+<!-- ── MAIN ── -->
+<div id="main">
+  <!-- sidebar -->
+  <div id="sidebar"></div>
+
+  <!-- content -->
+  <div id="content">
+    <div id="tabs">
+      <div class="tab active" data-tab="console" title="Live serial output from the board (and flasher output).">Console</div>
+      <div class="tab" data-tab="aps" title="Access points parsed from the live scan. # is the index used by 'select -a'.">Access Points</div>
+      <div class="tab" data-tab="stations" title="Client devices (stations) parsed from the scan. # is the index used by 'select -c'.">Stations</div>
+    </div>
+
+    <!-- console pane -->
+    <div class="pane active" id="pane-console">
+      <div id="console"></div>
+      <div id="input-bar">
+        <input id="raw-input" placeholder="Type a command..." autocomplete="off"
+               title="Type any Marauder command and press Enter to send it (Ctrl+K to focus here; Up/Down for history).">
+        <button id="btn-send" title="Send the typed command to the board.">Send</button>
+      </div>
+    </div>
+
+    <!-- AP table pane -->
+    <div class="pane" id="pane-aps">
+      <table class="data">
+        <thead><tr><th>#</th><th>SSID</th><th>Ch</th><th>RSSI</th><th>BSSID</th></tr></thead>
+        <tbody id="ap-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Station table pane -->
+    <div class="pane" id="pane-stations">
+      <table class="data">
+        <thead><tr><th>#</th><th>MAC</th><th>AP BSSID</th><th>RSSI</th></tr></thead>
+        <tbody id="sta-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── PARAM MODAL ── -->
+<div class="modal-overlay" id="param-modal">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <p id="modal-desc" style="color:var(--muted);font-size:12px;margin-bottom:8px;"></p>
+    <div id="modal-fields"></div>
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" id="modal-run">Run</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── FLASH MODAL ── -->
+<div class="modal-overlay" id="flash-modal">
+  <div class="modal" style="min-width:460px;max-width:600px;">
+    <h3>&#x26a1; Flash Firmware</h3>
+
+    <!-- port + detect -->
+    <label>Port</label>
+    <div class="flash-row">
+      <input id="flash-port" placeholder="COM5 or /dev/ttyUSB0" autocomplete="off"
+             title="Serial port of the board to flash (e.g. COM5 or /dev/ttyUSB0). Prefilled from the toolbar; editable.">
+      <button id="flash-detect-btn" title="Talk to the board over USB and read which ESP32 chip it is (esp32, esp32s3, ...). Run once so the right firmware variant is picked.">Detect chip</button>
+      <span id="flash-chip-lbl" style="white-space:nowrap;" title="The detected chip family. Shows '?' until you press Detect chip.">chip: ?</span>
+    </div>
+
+    <!-- firmware profile -->
+    <label>Firmware</label>
+    <select id="flash-profile" title="Which firmware to flash. Defaults to ESP32 Marauder (the normal flow). Switching re-targets the release list / variant picker; the Suicide-build option is Marauder-only."></select>
+
+    <!-- normal-mode rows (hidden when Suicide build is checked) -->
+    <div id="flash-normal">
+      <label>Mode</label>
+      <div class="flash-row" id="flash-mode-row">
+        <label class="inline" title="Write only the application image (re-flash / update an existing board).">
+          <input type="radio" name="flash-mode" value="app" checked> Update app only
+        </label>
+        <label class="inline" title="Flash bootloader + partitions + app to a blank board (downloads support files).">
+          <input type="radio" name="flash-mode" value="full"> Full flash (blank board)
+        </label>
+      </div>
+
+      <label id="flash-source-label">Source</label>
+      <div class="flash-row" id="flash-source-row">
+        <label class="inline" title="Fetch the official firmware for your chip from GitHub releases.">
+          <input type="radio" name="flash-source" value="download" checked> Download latest
+        </label>
+        <label class="inline" title="Flash a firmware .bin file you already have on disk instead of downloading.">
+          <input type="radio" name="flash-source" value="local"> Local .bin
+        </label>
+      </div>
+
+      <div id="flash-dl-row">
+        <label>Variant</label>
+        <div class="flash-row">
+          <button id="flash-load-btn" title="Download the list of available firmware variants from the latest GitHub release.">Load releases</button>
+          <select id="flash-variant" style="flex:1;" title="Pick the firmware build that matches your exact board/display. The best match for the detected chip is preselected."></select>
+        </div>
+      </div>
+
+      <div id="flash-local-row">
+        <label>Local .bin path</label>
+        <input id="flash-local" placeholder="C:\path\to\firmware.bin" autocomplete="off"
+               title="Path to a local firmware .bin to flash (used when 'Local .bin' is selected).">
+      </div>
+    </div>
+
+    <!-- suicide checkbox (only shown for suicide-capable profiles) -->
+    <label class="inline" id="flash-suicide-wrap" style="margin-top:10px;"
+           title="Owner-only hardened build that can self-wipe. Only available for firmware that supports it.">
+      <input type="checkbox" id="flash-suicide" title="Flash a provisioned anti-forensic bundle instead of a normal build. Marauder-only."> Suicide build (flash a provisioned anti-forensic bundle)
+    </label>
+
+    <!-- suicide panel (hidden until the checkbox is ticked) -->
+    <div id="flash-suicide-panel" style="display:none;">
+      <label>Mode</label>
+      <div class="flash-row">
+        <label class="inline"><input type="radio" name="suicide-mode" value="new" checked> Provision new bundle</label>
+        <label class="inline"><input type="radio" name="suicide-mode" value="existing"> Flash existing bundle</label>
+      </div>
+
+      <div id="suicide-new-panel">
+        <label>Boot password</label>
+        <input id="suicide-pw" type="password" placeholder="Boot password" autocomplete="new-password">
+        <label>Confirm password</label>
+        <input id="suicide-pw2" type="password" placeholder="Confirm password" autocomplete="new-password">
+        <label>Variant</label>
+        <select id="suicide-variant">
+          <option value="fork">fork (standard)</option>
+          <option value="guardian">guardian (dual-app)</option>
+        </select>
+        <label>Arm GPIO pin (0-48)</label>
+        <input id="suicide-arm-pin" type="number" value="27" min="0" max="48">
+        <label>Max fail attempts (1-10)</label>
+        <input id="suicide-max-att" type="number" value="2" min="1" max="10">
+        <label class="inline" style="margin-top:8px;">
+          <input type="checkbox" id="suicide-deadman" checked> Dead-man switch
+        </label>
+        <label class="inline" style="margin-top:4px;">
+          <input type="checkbox" id="suicide-armed"> Armed (board WILL self-destruct on trigger)
+        </label>
+        <label>Build directory (optional, for compiled firmware)</label>
+        <input id="suicide-build-dir" placeholder="path to compiled firmware (optional)" autocomplete="off">
+      </div>
+
+      <div id="suicide-existing-panel" style="display:none;">
+        <label>Bundle dir</label>
+        <input id="flash-bundle-dir" placeholder="folder containing bundle.json + .bin images" autocomplete="off"
+               title="Folder produced by the provisioner: bundle.json plus firmware .bin images.">
+      </div>
+
+      <p class="flash-danger">
+        &#x26a0; SAFETY: Anti-forensic build (boot password + 2-fail wipe + GPIO dead-man). Test in SAFE_MODE first.
+      </p>
+      <p class="flash-note">
+        Password is hashed locally (PBKDF2-HMAC-SHA256), never stored or transmitted. eFuses are NOT burned here.
+      </p>
+    </div>
+
+    <!-- baud + actions -->
+    <label>Baud</label>
+    <select id="flash-baud" title="Serial transfer speed. Drop to 115200 if a flash stalls.">
+      <option value="115200">115200</option>
+      <option value="460800">460800</option>
+      <option value="921600" selected>921600</option>
+    </select>
+
+    <div class="modal-actions">
+      <button onclick="closeFlashModal()" title="Close the flasher.">Cancel</button>
+      <button id="flash-erase-btn" title="Wipe the board's entire flash. Use before a full flash, or to recover a bad install.">Erase</button>
+      <button class="primary" id="flash-go-btn" title="Write the selected firmware (or Suicide bundle) to the board over USB. Don't unplug while it runs.">&#x26a1; FLASH</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const socket = io();
+let cmdCatalog = [];
+let currentCmd = null;
+const MAX_CONSOLE = 2000;
+
+// ── socket events ──────────────────────────────────────────────────────── //
+
+socket.on("serial", (d) => {
+  const con = document.getElementById("console");
+  const div = document.createElement("div");
+  const line = d.line || "";
+  if (line.startsWith(">>")) div.className = "cmd";
+  else if (line.includes("[error]") || line.includes("[serial error]")) div.className = "err";
+  div.textContent = line;
+  con.appendChild(div);
+  while (con.children.length > MAX_CONSOLE) con.removeChild(con.firstChild);
+  con.scrollTop = con.scrollHeight;
+});
+
+socket.on("status", (d) => {
+  const dot = document.getElementById("status-dot");
+  const btn = document.getElementById("btn-connect");
+  if (d.connected) {
+    dot.classList.add("on");
+    btn.textContent = "Disconnect";
+    btn.dataset.state = "on";
+  } else {
+    dot.classList.remove("on");
+    btn.textContent = "Connect";
+    btn.dataset.state = "off";
+    if (d.error) appendConsole("[error] " + d.error, "err");
+  }
+});
+
+socket.on("tables", (d) => {
+  renderTable("ap-tbody", d.aps, ["index","ssid","channel","rssi","bssid"]);
+  renderTable("sta-tbody", d.stations, ["index","mac","ap_bssid","rssi"]);
+  document.querySelector('[data-tab="aps"]').textContent = `Access Points (${d.aps.length})`;
+  document.querySelector('[data-tab="stations"]').textContent = `Stations (${d.stations.length})`;
+});
+
+socket.on("log_status", (d) => {
+  if (d.enabled) appendConsole("[log] Recording to " + d.path, "cmd");
+  else appendConsole("[log] Stopped", "cmd");
+});
+
+// Flasher status: chip detect result, release/variant list, errors, and the done/rc
+// terminator. All server-provided strings rendered via textContent/esc — never innerHTML.
+socket.on("flash_status", (d) => {
+  if (d.error) {
+    appendConsole("[flash error] " + d.error, "err");
+    return;
+  }
+  if (d.chip !== undefined) {
+    const chip = d.chip || "?";
+    setFlashChip(chip === "?" ? "" : chip);
+    appendConsole("[flash] detected chip: " + chip, "cmd");
+  }
+  if (d.tag !== undefined && d.assets !== undefined) {
+    appendConsole(`[flash] ${d.tag}: ${d.assets.length} variant(s)`, "cmd");
+    populateVariants(d.assets);
+  }
+  if (d.done) {
+    appendConsole(d.rc === 0 ? "[flash] done — power-cycle the board"
+                             : "[flash] finished with exit code " + d.rc,
+                  d.rc === 0 ? "cmd" : "err");
+    setFlashBusy(false);
+  }
+});
+
+// ── helpers ────────────────────────────────────────────────────────────── //
+
+function appendConsole(text, cls) {
+  const con = document.getElementById("console");
+  const div = document.createElement("div");
+  if (cls) div.className = cls;
+  div.textContent = text;
+  con.appendChild(div);
+  con.scrollTop = con.scrollHeight;
+}
+
+function esc(v) {
+  if (v === undefined || v === null || v === -1) return "";
+  const d = document.createElement("span");
+  d.textContent = String(v);
+  return d.innerHTML;
+}
+
+function renderTable(tbodyId, rows, fields) {
+  const tbody = document.getElementById(tbodyId);
+  let html = "";
+  for (const r of rows) {
+    html += "<tr>";
+    for (const f of fields) {
+      const cls = f === "rssi" ? ' class="rssi"' : "";
+      html += `<td${cls}>${esc(r[f])}</td>`;
+    }
+    html += "</tr>";
+  }
+  tbody.innerHTML = html;
+}
+
+// ── toolbar ────────────────────────────────────────────────────────────── //
+
+function refreshPorts() {
+  fetch("/api/ports").then(r => r.json()).then(ports => {
+    const sel = document.getElementById("port-select");
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Auto-detect</option>';
+    for (const p of ports) {
+      const opt = document.createElement("option");
+      opt.value = p.device;
+      opt.textContent = `${p.device} — ${p.description}`;
+      sel.appendChild(opt);
+    }
+    if (cur) sel.value = cur;
+  });
+}
+
+document.getElementById("btn-refresh").onclick = refreshPorts;
+
+document.getElementById("btn-connect").onclick = () => {
+  const btn = document.getElementById("btn-connect");
+  if (btn.dataset.state === "on") {
+    socket.emit("disconnect_serial");
+  } else {
+    const port = document.getElementById("port-select").value || null;
+    socket.emit("connect_serial", {port});
+  }
+};
+
+document.getElementById("btn-stop").onclick = () => {
+  socket.emit("stop");
+  document.getElementById("chk-autolist").checked = false;
+  socket.emit("autolist", {enabled: false});
+};
+
+document.getElementById("btn-clear").onclick = () => {
+  document.getElementById("console").innerHTML = "";
+};
+
+document.getElementById("chk-autolist").onchange = (e) => {
+  socket.emit("autolist", {enabled: e.target.checked});
+};
+
+document.getElementById("chk-log").onchange = (e) => {
+  socket.emit("toggle_log", {enabled: e.target.checked});
+};
+
+// ── raw input ──────────────────────────────────────────────────────────── //
+
+const rawInput = document.getElementById("raw-input");
+const cmdHistory = [];
+let histIdx = -1;
+
+rawInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const val = rawInput.value.trim();
+    if (val) {
+      socket.emit("send_command", {raw: val});
+      cmdHistory.unshift(val);
+      if (cmdHistory.length > 100) cmdHistory.pop();
+      histIdx = -1;
+      rawInput.value = "";
+    }
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (histIdx < cmdHistory.length - 1) { histIdx++; rawInput.value = cmdHistory[histIdx]; }
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (histIdx > 0) { histIdx--; rawInput.value = cmdHistory[histIdx]; }
+    else { histIdx = -1; rawInput.value = ""; }
+  }
+});
+document.getElementById("btn-send").onclick = () => {
+  rawInput.dispatchEvent(new KeyboardEvent("keydown", {key:"Enter"}));
+};
+
+// ── tabs ───────────────────────────────────────────────────────────────── //
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("pane-" + tab.dataset.tab).classList.add("active");
+    if (tab.dataset.tab !== "console") socket.emit("get_tables");
+  };
+});
+
+// ── sidebar ────────────────────────────────────────────────────────────── //
+
+function buildSidebar(catalog) {
+  const sb = document.getElementById("sidebar");
+  sb.innerHTML = "";
+  for (const group of catalog) {
+    const label = document.createElement("div");
+    label.className = "cat-label";
+    label.textContent = group.category;
+    sb.appendChild(label);
+    for (const cmd of group.commands) {
+      const btn = document.createElement("button");
+      btn.className = "cmd-btn" + (cmd.danger ? " danger" : "");
+      btn.textContent = cmd.label;
+      btn.title = cmd.desc + (cmd.longrunning ? " (long-running — use STOP)" : "") + (cmd.danger ? " [DANGER]" : "");
+      btn.onclick = () => runCmd(cmd);
+      sb.appendChild(btn);
+    }
+  }
+}
+
+function runCmd(cmd) {
+  if (cmd.params && cmd.params.length > 0) {
+    openModal(cmd);
+  } else {
+    if (cmd.danger && !confirm(`Run "${cmd.label}"? This is a potentially disruptive action.`)) return;
+    socket.emit("send_command", {cmd_id: cmd.id, values: {}});
+    if (cmd.longrunning && document.getElementById("chk-autolist").checked) {
+      socket.emit("autolist", {enabled: true});
+    }
+  }
+}
+
+// ── param modal ────────────────────────────────────────────────────────── //
+
+function openModal(cmd) {
+  currentCmd = cmd;
+  document.getElementById("modal-title").textContent = cmd.label;
+  document.getElementById("modal-desc").textContent = cmd.desc;
+  const fields = document.getElementById("modal-fields");
+  fields.innerHTML = "";
+  for (const p of cmd.params) {
+    const lbl = document.createElement("label");
+    lbl.textContent = p.name + (p.required ? " *" : "") + (p.help ? ` — ${p.help}` : "");
+    fields.appendChild(lbl);
+
+    let input;
+    if (p.kind === "select") {
+      input = document.createElement("select");
+      if (!p.required) { const o = document.createElement("option"); o.value = ""; o.textContent = "(none)"; input.appendChild(o); }
+      for (const c of (p.choices || [])) { const o = document.createElement("option"); o.value = c; o.textContent = c; input.appendChild(o); }
+    } else if (p.kind === "bool") {
+      input = document.createElement("input");
+      input.type = "checkbox";
+      input.style.width = "auto";
+    } else {
+      input = document.createElement("input");
+      input.type = p.kind === "int" ? "number" : "text";
+      input.placeholder = p.placeholder || "";
+    }
+    input.dataset.param = p.name;
+    input.dataset.kind = p.kind;
+    fields.appendChild(input);
+  }
+  document.getElementById("param-modal").classList.add("show");
+}
+
+function closeModal() {
+  document.getElementById("param-modal").classList.remove("show");
+  currentCmd = null;
+}
+
+document.getElementById("modal-run").onclick = () => {
+  if (!currentCmd) return;
+  const values = {};
+  document.querySelectorAll("#modal-fields [data-param]").forEach(el => {
+    const name = el.dataset.param;
+    if (el.dataset.kind === "bool") values[name] = el.checked;
+    else if (el.dataset.kind === "int") values[name] = el.value ? parseInt(el.value) : null;
+    else values[name] = el.value;
+  });
+  if (currentCmd.danger && !confirm(`Run "${currentCmd.label}"? This is a potentially disruptive action.`)) return;
+  socket.emit("send_command", {cmd_id: currentCmd.id, values});
+  if (currentCmd.longrunning && document.getElementById("chk-autolist").checked) {
+    socket.emit("autolist", {enabled: true});
+  }
+  closeModal();
+};
+
+document.getElementById("param-modal").onclick = (e) => {
+  if (e.target.id === "param-modal") closeModal();
+};
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeModal();
+    if (!flashBusy) closeFlashModal();
+  }
+});
+
+// ── keyboard shortcuts ─────────────────────────────────────────────────── //
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.key === "l") { e.preventDefault(); document.getElementById("btn-clear").click(); return; }
+  if (e.ctrlKey && e.key === ".") { e.preventDefault(); document.getElementById("btn-stop").click(); return; }
+  if (e.ctrlKey && e.key === "k") { e.preventDefault(); rawInput.focus(); return; }
+});
+
+// ── flash modal ────────────────────────────────────────────────────────── //
+
+let flashProfiles = [];          // [{id,label,supports_suicide,image_model}]
+let flashVariants = [];          // current loaded asset list: [{name,label,chip}]
+let flashBusy = false;
+
+function currentFlashProfile() {
+  const id = document.getElementById("flash-profile").value;
+  return flashProfiles.find(p => p.id === id) || null;
+}
+
+function setFlashChip(chip) {
+  // chip is server-provided — render via textContent only.
+  document.getElementById("flash-chip-lbl").textContent = "chip: " + (chip || "?");
+}
+
+function setFlashBusy(on) {
+  flashBusy = on;
+  document.getElementById("flash-go-btn").disabled = on;
+  document.getElementById("flash-erase-btn").disabled = on;
+  document.getElementById("flash-detect-btn").disabled = on;
+}
+
+function populateVariants(assets) {
+  flashVariants = assets || [];
+  const sel = document.getElementById("flash-variant");
+  sel.textContent = "";                       // clear (no innerHTML)
+  for (const a of flashVariants) {
+    const opt = document.createElement("option");
+    opt.value = a.name;                        // value used as the lookup key by the backend
+    // Build a human label safely; textContent escapes all server strings.
+    const chip = a.chip ? ` (${a.chip})` : "";
+    opt.textContent = `${a.label || a.name}${chip}  [${a.name}]`;
+    sel.appendChild(opt);
+  }
+}
+
+function applyFlashProfileUi() {
+  const p = currentFlashProfile();
+  const supportsSuicide = !!(p && p.supports_suicide);
+  const isCustom = !!(p && p.id === "custom");
+  const suicideWrap = document.getElementById("flash-suicide-wrap");
+  const suicideBox = document.getElementById("flash-suicide");
+
+  // Suicide checkbox only meaningful for suicide-capable profiles.
+  if (!supportsSuicide && suicideBox.checked) suicideBox.checked = false;
+  suicideWrap.style.display = supportsSuicide ? "inline-flex" : "none";
+  suicideBox.disabled = !supportsSuicide;
+
+  const inSuicide = supportsSuicide && suicideBox.checked;
+  // Normal rows hidden in suicide mode; 'custom' hides the download/release rows.
+  document.getElementById("flash-normal").style.display = inSuicide ? "none" : "block";
+  document.getElementById("flash-suicide-panel").style.display = inSuicide ? "block" : "none";
+  document.getElementById("flash-source-label").style.display = isCustom ? "none" : "block";
+  document.getElementById("flash-source-row").style.display = isCustom ? "none" : "flex";
+  document.getElementById("flash-dl-row").style.display = isCustom ? "none" : "block";
+  if (isCustom) {
+    // custom is local-only — force the local source.
+    document.querySelector('input[name="flash-source"][value="local"]').checked = true;
+  }
+}
+
+function openFlashModal() {
+  // Prefill the port from the toolbar selection (still editable).
+  const tbPort = document.getElementById("port-select").value;
+  if (tbPort) document.getElementById("flash-port").value = tbPort;
+  applyFlashProfileUi();
+  setFlashBusy(false);
+  document.getElementById("flash-modal").classList.add("show");
+}
+
+function closeFlashModal() {
+  document.getElementById("flash-modal").classList.remove("show");
+}
+
+function loadFlashProfiles() {
+  fetch("/api/profiles").then(r => r.json()).then(profiles => {
+    flashProfiles = profiles;
+    const sel = document.getElementById("flash-profile");
+    sel.textContent = "";
+    for (const p of profiles) {
+      const opt = document.createElement("option");
+      opt.value = p.id;                        // id is a known stable token
+      opt.textContent = p.label;               // server label via textContent
+      sel.appendChild(opt);
+    }
+    // default to marauder if present
+    if (profiles.some(p => p.id === "marauder")) sel.value = "marauder";
+    applyFlashProfileUi();
+  });
+}
+
+document.getElementById("btn-flash").onclick = openFlashModal;
+
+document.getElementById("flash-profile").onchange = () => {
+  // Switching firmware invalidates the loaded release/variant list.
+  flashVariants = [];
+  document.getElementById("flash-variant").textContent = "";
+  applyFlashProfileUi();
+};
+
+document.getElementById("flash-suicide").onchange = applyFlashProfileUi;
+
+document.addEventListener('change', (e) => {
+  if (e.target.name === 'suicide-mode') {
+    const isNew = e.target.value === 'new';
+    document.getElementById('suicide-new-panel').style.display = isNew ? 'block' : 'none';
+    document.getElementById('suicide-existing-panel').style.display = isNew ? 'none' : 'block';
+  }
+});
+
+document.getElementById("flash-detect-btn").onclick = () => {
+  const port = document.getElementById("flash-port").value.trim();
+  if (!port) { appendConsole("[flash error] enter a port first", "err"); return; }
+  socket.emit("flash_detect", {port});
+};
+
+document.getElementById("flash-load-btn").onclick = () => {
+  const profile = document.getElementById("flash-profile").value || "marauder";
+  const chip = flashChipValue();
+  socket.emit("flash_releases", {profile, chip});
+};
+
+function flashChipValue() {
+  // Derive the detected chip from the label ("chip: esp32s3" -> "esp32s3"; "?" -> "").
+  const txt = document.getElementById("flash-chip-lbl").textContent || "";
+  const chip = txt.replace(/^chip:\s*/, "").trim();
+  return (chip && chip !== "?") ? chip : "";
+}
+
+document.getElementById("flash-go-btn").onclick = () => {
+  if (flashBusy) return;
+  const port = document.getElementById("flash-port").value.trim();
+  if (!port) { appendConsole("[flash error] enter a port first", "err"); return; }
+  const profile = currentFlashProfile();
+  const chip = flashChipValue();
+  const baud = parseInt(document.getElementById("flash-baud").value, 10);
+
+  // Suicide-bundle path.
+  if (profile && profile.supports_suicide && document.getElementById("flash-suicide").checked) {
+    const suicideMode = document.querySelector('input[name="suicide-mode"]:checked').value;
+    if (suicideMode === "existing") {
+      const bundleDir = document.getElementById("flash-bundle-dir").value.trim();
+      if (!bundleDir) { appendConsole("[flash error] enter the bundle directory", "err"); return; }
+      if (!confirm(`Flash suicide bundle to ${port}?\nTest in SAFE_MODE first. Don't unplug.`)) return;
+      setFlashBusy(true);
+      socket.emit("flash_suicide_run", {port, chip, bundle_dir: bundleDir, baud});
+    } else {
+      const pw = document.getElementById("suicide-pw").value;
+      const pw2 = document.getElementById("suicide-pw2").value;
+      if (!pw) { appendConsole("[flash error] enter a boot password", "err"); return; }
+      if (pw !== pw2) { appendConsole("[flash error] passwords don't match", "err"); return; }
+      const armed = document.getElementById("suicide-armed").checked ? 1 : 0;
+      let msg = `Provision + flash suicide build to ${port}?\nPassword is hashed locally, never stored.`;
+      if (armed) msg += "\n\nWARNING: ARMED=1 — board WILL self-destruct on trigger!";
+      if (!confirm(msg)) return;
+      setFlashBusy(true);
+      socket.emit("flash_suicide_provision", {
+        port, chip, baud,
+        password: pw, password2: pw2,
+        variant: document.getElementById("suicide-variant").value,
+        arm_pin: parseInt(document.getElementById("suicide-arm-pin").value, 10) || 27,
+        max_att: parseInt(document.getElementById("suicide-max-att").value, 10) || 2,
+        deadman: document.getElementById("suicide-deadman").checked ? 1 : 0,
+        armed,
+        build_dir: document.getElementById("suicide-build-dir").value.trim() || null,
+      });
+      document.getElementById("suicide-pw").value = "";
+      document.getElementById("suicide-pw2").value = "";
+    }
+    return;
+  }
+
+  // Normal flash path.
+  const mode = document.querySelector('input[name="flash-mode"]:checked').value;
+  const source = document.querySelector('input[name="flash-source"]:checked').value;
+  const variant = document.getElementById("flash-variant").value || null;
+  const local = document.getElementById("flash-local").value.trim();
+  const isCustom = profile && profile.id === "custom";
+  const useDownload = source === "download" && !isCustom;
+
+  if (useDownload && !variant) {
+    appendConsole("[flash error] load the release list and pick a variant", "err"); return;
+  }
+  if (!useDownload && !local) {
+    appendConsole("[flash error] enter a local .bin path", "err"); return;
+  }
+  const board = profile ? profile.label : profile;
+  if (!confirm(`Flash ${mode === "full" ? "FULL (blank board)" : "app"} firmware for "${board}" to ${port}?\n\nDon't unplug while it runs.`)) return;
+  setFlashBusy(true);
+  socket.emit("flash_run", {
+    port, chip, profile: profile ? profile.id : "marauder",
+    mode, source: useDownload ? "download" : "local", variant, local, baud,
+  });
+};
+
+document.getElementById("flash-erase-btn").onclick = () => {
+  if (flashBusy) return;
+  const port = document.getElementById("flash-port").value.trim();
+  if (!port) { appendConsole("[flash error] enter a port first", "err"); return; }
+  if (!confirm(`Erase the ENTIRE flash on the board at ${port}? This cannot be undone.`)) return;
+  setFlashBusy(true);
+  socket.emit("flash_erase", {port, chip: flashChipValue()});
+};
+
+document.getElementById("flash-modal").onclick = (e) => {
+  if (e.target.id === "flash-modal" && !flashBusy) closeFlashModal();
+};
+
+// ── init ───────────────────────────────────────────────────────────────── //
+
+refreshPorts();
+loadFlashProfiles();
+fetch("/api/commands").then(r => r.json()).then(catalog => {
+  cmdCatalog = catalog;
+  buildSidebar(catalog);
+});
+fetch("/api/status").then(r => r.json()).then(s => {
+  if (s.connected) {
+    document.getElementById("status-dot").classList.add("on");
+    document.getElementById("btn-connect").textContent = "Disconnect";
+    document.getElementById("btn-connect").dataset.state = "on";
+  }
+});
+</script>
+</body>
+</html>
