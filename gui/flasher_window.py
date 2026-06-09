@@ -263,6 +263,9 @@ class FlasherWindow(tk.Toplevel):
                 line = self.q.get_nowait()
                 self.console.config(state="normal")
                 self.console.insert("end", line + "\n")
+                line_count = int(self.console.index("end-1c").split(".")[0])
+                if line_count > 10000:
+                    self.console.delete("1.0", f"{line_count - 10000}.0")
                 self.console.see("end")
                 self.console.config(state="disabled")
         except queue.Empty:

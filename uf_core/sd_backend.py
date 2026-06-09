@@ -567,6 +567,7 @@ def _write_windows(img_path: str, device: str, on_line: Line,
     IOCTL_DISK_GET_LENGTH_INFO = 0x0007405C
 
     kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    kernel32.CreateFileW.restype = ctypes.c_void_p
 
     # open physical drive for raw write
     handle = kernel32.CreateFileW(
@@ -695,6 +696,7 @@ def verify_write(img_path: str, device: str, on_line: Line,
         OPEN_EXISTING = 3
         INVALID_HANDLE = ctypes.c_void_p(-1).value
         kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        kernel32.CreateFileW.restype = ctypes.c_void_p
         handle = kernel32.CreateFileW(
             device, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
             None, OPEN_EXISTING, 0, None,
