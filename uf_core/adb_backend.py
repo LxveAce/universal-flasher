@@ -524,7 +524,11 @@ def install_rayhunter(on_line: Line, serial: Optional[str] = None,
             expected_raw = _http_get(sha_asset["browser_download_url"]).decode("utf-8").strip()
             expected_hash = expected_raw.split()[0].lower()
             import hashlib
-            actual = hashlib.sha256(open(zip_path, "rb").read()).hexdigest().lower()
+            _h = hashlib.sha256()
+            with open(zip_path, "rb") as _f:
+                for _blk in iter(lambda: _f.read(1 << 20), b""):
+                    _h.update(_blk)
+            actual = _h.hexdigest().lower()
             if actual != expected_hash:
                 on_line(f"[error] sha256 mismatch: expected {expected_hash}, got {actual}")
                 return 1
