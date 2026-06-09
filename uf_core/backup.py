@@ -36,7 +36,7 @@ def backup_flash(port: str, on_line: Line, chip: Optional[str] = None,
         on_line("[backup] Detecting chip...")
         chip = _detect_chip(port, on_line)
         if not chip:
-            on_line("[error] Could not detect chip on {port}")
+            on_line(f"[error] Could not detect chip on {port}")
             return None
 
     dest_dir = output_dir or _data_dir()
@@ -92,7 +92,7 @@ def backup_flash(port: str, on_line: Line, chip: Optional[str] = None,
         on_line(f"[backup] Saved: {dest}")
 
         meta_path = dest + ".meta"
-        with open(meta_path, "w") as f:
+        with open(meta_path, "w", encoding="utf-8") as f:
             f.write(f"chip={chip}\n")
             f.write(f"port={port}\n")
             f.write(f"flash_size={flash_size}\n")
@@ -116,7 +116,7 @@ def restore_flash(port: str, backup_path: str, on_line: Line,
     if not chip:
         meta_path = backup_path + ".meta"
         if os.path.isfile(meta_path):
-            with open(meta_path) as f:
+            with open(meta_path, encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("chip="):
                         chip = line.split("=", 1)[1].strip()
@@ -171,7 +171,7 @@ def list_backups(backup_dir: Optional[str] = None):
 
         meta_path = path + ".meta"
         if os.path.isfile(meta_path):
-            with open(meta_path) as mf:
+            with open(meta_path, encoding="utf-8") as mf:
                 for line in mf:
                     if "=" in line:
                         k, v = line.strip().split("=", 1)

@@ -51,6 +51,7 @@ Repository = "https://github.com/LxveAce/universal-flasher"
 Issues = "https://github.com/LxveAce/universal-flasher/issues"
 
 [project.scripts]
+universal-flasher-qt = "gui_qt.app:main"
 universal-flasher-tk = "gui.app:main"
 universal-flasher-tui = "tui.app:main"
 universal-flasher-web = "web.app:main"

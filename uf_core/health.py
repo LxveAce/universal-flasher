@@ -64,6 +64,8 @@ def check_health(port: str, expected_firmware: str, on_line: Line,
     except ImportError:
         return HealthResult(healthy=False, errors=["pyserial not installed"])
 
+    from .device_detect import FIRMWARE_SIGNATURES
+
     result = HealthResult(healthy=False)
     lines: List[str] = []
     start = time.monotonic()
@@ -105,7 +107,6 @@ def check_health(port: str, expected_firmware: str, on_line: Line,
                         sig_hits += 1
                         break
 
-                from .device_detect import FIRMWARE_SIGNATURES
                 for fw_id, pattern in FIRMWARE_SIGNATURES.items():
                     m = re.search(pattern, line)
                     if m:
