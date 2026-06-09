@@ -1,0 +1,13 @@
+# Universal Flasher — Python dependencies (install in a venv)
+#
+# Tkinter (the desktop GUI) is NOT a pip package — it ships with Python.
+# On Kali/Debian install it once via apt:   sudo apt install -y python3-tk
+
+pyserial>=3.5       # serial link to boards (all apps)
+textual>=0.50       # terminal UI (tui/app.py only)
+esptool>=4.7,<6     # ESP32 firmware flashing
+flask>=3.0          # browser UI backend (web/app.py)
+flask-socketio>=5.3 # real-time WebSocket push for browser UI
+requests>=2.28      # firmware downloads, API checks
+psutil>=5.9         # USB device detection, system monitoring
+esp-idf-nvs-partition-gen==0.2.0  # NVS image generator for suicide-build provisioner

@@ -1,0 +1,25 @@
+# host/requirements.txt -- Suicide Marauder host provisioner dependencies.
+#
+# provision.py itself uses only the Python 3.9+ standard library for everything security-relevant
+# (getpass, os.urandom, hashlib.pbkdf2_hmac, csv, json, argparse). argon2 is NOT used: OWASP's
+# Argon2id 19 MiB minimum is impossible on ESP32 RAM, so the device uses PBKDF2-HMAC-SHA256 and the
+# host must match it -- see docs/SPEC.md section 9.
+#
+# Supply chain (SPEC section 14): the flash host is part of the TRUSTED computing base AT FLASH TIME
+# -- it types/hashes the password and writes firmware before any on-device control exists. To shrink
+# that window these tools are PINNED toward exact, known-good versions rather than floating ranges.
+# NEXT HARDENING STEP: add wheel hashes (`pip install --require-hashes`) and pin firmware bundles by
+# signed tag / out-of-band digest. A sha256 co-located in bundle.json guards corruption/accident, not
+# a determined attacker -- real integrity needs an out-of-band/signed manifest (see THREAT-MODEL.md).
+
+# The ONE external dependency is the NVS partition image generator. It is NOT bundled with esptool
+# (confirmed), so install it here. provision.py guards the call: if it is missing, it prints an
+# actionable message instead of crashing. You may instead vendor nvs_partition_gen.py into
+# host/vendor/ (Apache-2.0) or point --nvs-gen-dir at a copy, in which case this dep is optional.
+esp-idf-nvs-partition-gen==0.2.0   # known-good (pinned exact; bump deliberately + re-test)
+
+# esptool is consumed by the flasher (flasher-integration / headless-marauder-gui), not by
+# provision.py directly. It is listed here for convenience when staging a full flash workflow.
+# Pinned exact and kept < 6 to match the flasher (esptool v6 removes the chip_id / write_flash /
+# --flash_size aliases the flasher uses -- see headless-marauder-gui/requirements.txt).
+esptool==5.3.0   # known-good (pinned exact; < 6 per flasher compatibility; bump deliberately + re-test)

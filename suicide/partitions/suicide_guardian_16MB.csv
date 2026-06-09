@@ -1,0 +1,46 @@
+# suicide_guardian_16MB.csv — GUARDIAN variant, 16 MB flash (0x1000000)
+#
+# docs/SPEC.md §3.3 / §1 (GUARDIAN). A tiny `factory` Guardian app gates first on cold boot
+# (blank otadata => bootloader runs factory), then esp_ota_set_boot_partition(ota_0) + esp_restart()
+# hands off to an UNMODIFIED Marauder in `ota_0`. To re-assert the gate, the Guardian either erases
+# `otadata` or calls set_boot_partition(factory) (which itself just formats otadata — verified in
+# esp_ota_ops.c). Enable CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE so a Marauder that never marks
+# itself valid auto-reverts to the Guardian factory app.
+#
+# Does NOT fit in 4 MB: two large apps (Guardian factory + ~1.875 MB Marauder) plus filesystems
+# overflow 4 MB; 8 MB minimum, 16 MB preferred (this table). Bootloader @0x1000 (classic) / @0x0
+# (S3/C3); partition table @0x8000. App offsets 64 KB (0x10000) aligned; data 4 KB aligned.
+#
+# Partition roles:
+#   nvs       Marauder's own NVS (kept separate from gate state)
+#   otadata   bootloader's OTA-select sectors (blank => boot factory/Guardian)
+#   factory   the Guardian gate app (1 MB; the gate is small, this is generous headroom)
+#   ota_0     unmodified Marauder app (2 MB; >= its ~1.875 MB min_spiffs slot)
+#   guardcfg  gate config (subtype nvs, namespaces sgate/sgate_rt) — NEVER renamed; host keys off it
+#   spiffs    Marauder filesystem assets
+#   scratch   SAFE_MODE dry-run erase target (subtype 0x40) — REQUIRED for SUICIDE_SAFE_MODE builds
+#   coredump  crash dumps
+#
+# Layout math (see README.md):
+#   0x009000 +0x005000 -> 0x00E000  nvs
+#   0x00E000 +0x002000 -> 0x010000  otadata
+#   0x010000 +0x100000 -> 0x110000  factory (Guardian)   1 MB
+#   0x110000 +0x200000 -> 0x310000  ota_0   (Marauder)   2 MB
+#   0x310000 +0x010000 -> 0x320000  guardcfg             64 KB
+#   0x320000 +0xCC0000 -> 0xFE0000  spiffs               ~12.75 MB (shrunk 64 KB for scratch)
+#   0xFE0000 +0x010000 -> 0xFF0000  scratch              64 KB  (SAFE_MODE dry-run target, 0x40)
+#   0xFF0000 +0x010000 -> 0x1000000 coredump             64 KB  (end of 16 MB)
+#
+# `scratch` (data 0x40) is REQUIRED for SUICIDE_SAFE_MODE: the firmware refuses to simulate a wipe
+# (zero erases) if no `scratch` partition exists and NEVER falls back to a live partition
+# (docs/SPEC.md §3/§5/§8). Reclaimed by shrinking spiffs 0x10000; still fills 16 MB exactly.
+#
+# Name,    Type, SubType, Offset,   Size,     Flags
+nvs,       data, nvs,     0x9000,   0x5000,
+otadata,   data, ota,     0xe000,   0x2000,
+factory,   app,  factory, 0x10000,  0x100000,
+ota_0,     app,  ota_0,   0x110000, 0x200000,
+guardcfg,  data, nvs,     0x310000, 0x10000,
+spiffs,    data, spiffs,  0x320000, 0xCC0000,
+scratch,   data, 0x40,    0xFE0000, 0x10000,
+coredump,  data, coredump,0xFF0000, 0x10000,
