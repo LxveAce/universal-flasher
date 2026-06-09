@@ -303,7 +303,7 @@ table.data td.rssi { font-weight:bold; }
 </div>
 
 <script>
-const socket = io();
+const socket = io({auth: {token: "{{ auth_token }}"}});
 let cmdCatalog = [];
 let currentCmd = null;
 const MAX_CONSOLE = 2000;

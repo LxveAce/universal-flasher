@@ -53,7 +53,7 @@ def cache_firmware(profile_id: str, tag: str, asset_name: str, data: bytes) -> s
 
     real_dir = os.path.realpath(dest_dir)
     real_dest = os.path.realpath(dest)
-    if not real_dest.startswith(real_dir + os.sep) and real_dest != os.path.join(real_dir, safe_asset):
+    if real_dest != os.path.join(real_dir, safe_asset) and not real_dest.startswith(real_dir + os.sep):
         raise ValueError(f"refusing cache path that escapes the cache dir: {dest!r}")
 
     with _lock:
@@ -139,7 +139,7 @@ def preload_all(profiles: Dict[str, Any], on_line: Line) -> None:
 
     `profiles` is the PROFILES dict from flasher.py (profile_id -> FirmwareProfile).
     """
-    import urllib.request
+    from .flasher import _http_get, _require_allowed_url
 
     for pid, profile in profiles.items():
         if profile.repo is None:
@@ -166,9 +166,8 @@ def preload_all(profiles: Dict[str, Any], on_line: Line) -> None:
                 continue
             on_line(f"[cache] downloading {pid}/{tag}/{name} ...")
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": "universal-flasher"})
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    data = resp.read()
+                _require_allowed_url(url)
+                data = _http_get(url)
                 cache_firmware(pid, tag, name, data)
                 on_line(f"[cache] cached {len(data)} bytes -> {pid}/{tag}/{name}")
             except Exception as e:

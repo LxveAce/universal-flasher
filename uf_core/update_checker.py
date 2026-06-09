@@ -4,7 +4,6 @@ import json
 import threading
 import time
 import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
@@ -45,9 +44,9 @@ def _fetch_release(repo: str) -> Optional[Dict]:
             return cached[1]
 
     try:
-        req = urllib.request.Request(api_url, headers=_UA)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        from .flasher import _http_get, _require_allowed_url
+        _require_allowed_url(api_url)
+        data = json.loads(_http_get(api_url).decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code == 429:
             # rate limited — use cached if available, even if stale

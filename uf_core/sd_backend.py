@@ -189,11 +189,19 @@ def download_image(url: str, dest_dir: str, on_line: Line,
         raise ValueError(f"refusing download dest that escapes the cache dir: {dest!r}")
     on_line(f"[download] {name}")
     resp = requests.get(url, headers=_UA, stream=True, timeout=60,
-                        allow_redirects=True)
+                        allow_redirects=False)
+    max_redirects = 10
+    for _ in range(max_redirects):
+        if not (resp.is_redirect or resp.is_permanent_redirect):
+            break
+        redirect_url = resp.headers.get("Location", "")
+        _require_allowed_url(redirect_url)
+        resp = requests.get(redirect_url, headers=_UA, stream=True, timeout=60,
+                            allow_redirects=False)
+    else:
+        if resp.is_redirect or resp.is_permanent_redirect:
+            raise ValueError(f"too many redirects (>{max_redirects}) downloading {url!r}")
     resp.raise_for_status()
-    # requests follows redirects automatically; verify the final URL is still allowed
-    if resp.url != url:
-        _require_allowed_url(resp.url)
     total = int(resp.headers.get("content-length", 0))
     written = 0
     with open(dest, "wb") as f:
@@ -504,7 +512,7 @@ def _write_dd(img_path: str, device: str, on_line: Line,
     # dd with status=progress for user feedback; we also track ourselves via file position
     argv = ["dd", f"if={img_path}", f"of={raw_dev}", "bs=4M", "conv=fsync", "status=progress"]
     # dd requires root on Linux/macOS
-    if os.geteuid() != 0 if hasattr(os, "geteuid") else False:
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
         argv = ["sudo"] + argv
 
     try:

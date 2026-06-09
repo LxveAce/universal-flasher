@@ -7,8 +7,10 @@ desktop and terminal UIs.
 """
 
 import argparse
+import hashlib
 import json
 import os
+import secrets
 import sys
 import threading
 
@@ -22,7 +24,10 @@ from uf_core import commands, flasher
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.urandom(24)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(app, cors_allowed_origins="http://127.0.0.1:5000", async_mode="threading")
+
+_AUTH_TOKEN = secrets.token_urlsafe(24)
+_authenticated_sids: set = set()
 
 ctrl = None
 parser = MarauderParser()
@@ -77,7 +82,7 @@ def _autolist_tick():
 
 @app.route("/")
 def index():
-    return render_template("index.html", version=__version__)
+    return render_template("index.html", version=__version__, auth_token=_AUTH_TOKEN)
 
 
 @app.route("/api/commands")
@@ -116,6 +121,28 @@ def api_profiles():
             "image_model": p.image_model,
         })
     return jsonify(out)
+
+
+# ── socket auth ────────────────────────────────────────────────────────── #
+
+@socketio.on("connect")
+def on_ws_connect(auth=None):
+    """Require the auth token on WebSocket connect. Reject unauthorized clients."""
+    from flask import request as flask_req
+    token = None
+    if auth and isinstance(auth, dict):
+        token = auth.get("token")
+    if not token:
+        token = flask_req.args.get("token")
+    if not token or not secrets.compare_digest(token, _AUTH_TOKEN):
+        return False
+    _authenticated_sids.add(flask_req.sid)
+
+
+@socketio.on("disconnect")
+def on_ws_disconnect():
+    from flask import request as flask_req
+    _authenticated_sids.discard(flask_req.sid)
 
 
 # ── socket events ───────────────────────────────────────────────────────── #
@@ -199,6 +226,11 @@ def on_clear_tables():
 def on_toggle_log(data):
     if data.get("enabled"):
         log_dir = data.get("dir") or logger.dir
+        real = os.path.realpath(log_dir)
+        home = os.path.realpath(os.path.expanduser("~"))
+        if not real.startswith(home + os.sep) and real != home:
+            emit("log_status", {"enabled": False, "error": "Log directory must be under the user home"})
+            return
         logger.set_dir(log_dir)
         path = logger.start()
         emit("log_status", {"enabled": True, "path": path})
@@ -492,8 +524,11 @@ def main():
             print(f"[!] Auto-connect failed: {e}")
 
     print(f"\n  Universal Flasher v{__version__} — Browser UI")
-    print(f"  Open http://{args.host}:{args.web_port} in your browser\n")
+    print(f"  Open http://{args.host}:{args.web_port} in your browser")
+    print(f"  Auth token: {_AUTH_TOKEN}\n")
 
+    origin = f"http://{args.host}:{args.web_port}"
+    socketio.cors_allowed_origins = [origin, f"http://127.0.0.1:{args.web_port}", f"http://localhost:{args.web_port}"]
     socketio.run(app, host=args.host, port=args.web_port, debug=False,
                  allow_unsafe_werkzeug=True)
 

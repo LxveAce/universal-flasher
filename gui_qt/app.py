@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QComboBox, QPlainTextEdit, QTabWidget,
     QTableWidget, QTableWidgetItem, QGroupBox, QScrollArea, QSplitter, QDialog,
     QFormLayout, QCheckBox, QRadioButton, QFileDialog, QMessageBox, QAbstractItemView,
-    QHeaderView, QButtonGroup, QAction, QShortcut, QStatusBar, QTextBrowser,
+    QHeaderView, QButtonGroup, QAction, QShortcut, QStatusBar, QTextBrowser, QSpinBox,
 )
 
 from uf_core import (
@@ -485,7 +485,7 @@ class FlasherDialog(QDialog):
         arow.addStretch()
         lay.addWidget(self.arow_w)
 
-        self.console = QPlainTextEdit(); self.console.setReadOnly(True); lay.addWidget(self.console)
+        self.console = QPlainTextEdit(); self.console.setReadOnly(True); self.console.setMaximumBlockCount(10000); lay.addWidget(self.console)
         self.console.setToolTip("Live esptool output for the current detect / flash / erase operation.")
 
         # Apply the initial profile-dependent visibility (default = marauder: all rows shown,
