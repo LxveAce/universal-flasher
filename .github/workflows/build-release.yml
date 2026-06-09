@@ -1,0 +1,131 @@
+name: Build Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install PyQt5 pyinstaller
+
+      - name: Build exe
+        run: python build.py --onefile
+
+      - name: Rename artifact
+        run: |
+          $tag = "${{ github.event.release.tag_name }}"
+          if (-not $tag) { $tag = "dev" }
+          Move-Item dist/headless-marauder.exe "dist/headless-marauder-${tag}-windows-x64.exe"
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.event.release.tag_name }}"
+          gh release upload $tag "dist/headless-marauder-${tag}-windows-x64.exe" --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/headless-marauder-*-windows-x64.exe
+
+  build-linux-x64:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install PyQt5 pyinstaller
+
+      - name: Build binary
+        run: python build.py --onefile
+
+      - name: Rename artifact
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          [ -z "$TAG" ] && TAG="dev"
+          mv dist/headless-marauder "dist/headless-marauder-${TAG}-linux-x64"
+          chmod +x "dist/headless-marauder-${TAG}-linux-x64"
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          gh release upload "$TAG" "dist/headless-marauder-${TAG}-linux-x64" --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: dist/headless-marauder-*-linux-x64
+
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv python3-tk python3-pyqt5 \
+            libxcb-xinerama0 libxcb-cursor0 libgl1
+
+      - name: Create venv with system packages
+        run: |
+          python3 -m venv --system-site-packages .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install pyinstaller
+
+      - name: Build binary
+        run: .venv/bin/python build.py --onefile
+
+      - name: Rename artifact
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          [ -z "$TAG" ] && TAG="dev"
+          mv dist/headless-marauder "dist/headless-marauder-${TAG}-linux-arm64"
+          chmod +x "dist/headless-marauder-${TAG}-linux-arm64"
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          gh release upload "$TAG" "dist/headless-marauder-${TAG}-linux-arm64" --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: dist/headless-marauder-*-linux-arm64

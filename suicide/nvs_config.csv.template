@@ -1,0 +1,48 @@
+# nvs_config.csv.template -- Suicide Marauder guardcfg NVS layout (namespace `sgate`).
+#
+# This is a TEMPLATE / documentation of the exact rows host/provision.py emits. provision.py
+# generates the real CSV in a temp dir at provision time (so the salted hash never lingers on
+# disk in the bundle) and feeds it to nvs_partition_gen. Keys, value types, and the namespace
+# string are CANONICAL: they MUST match docs/SPEC.md section 4 and firmware/bootgate/GateConfig.h.
+#
+# Format is the esp-idf nvs_partition_gen CSV: header is exactly `key,type,encoding,value`.
+# The first data row MUST be the namespace declaration row.
+#
+# Placeholders in <angle brackets> are filled in by provision.py:
+#   <SALT_HEX>   = os.urandom(16).hex()                          (32 hex chars)
+#   <PWHASH_HEX> = pbkdf2_hmac('sha256', pw, salt, iter, 32).hex() (64 hex chars)
+#   <ITER>       = PBKDF2 iteration count (default 10000 ~= 1s verify on classic ESP32; SPEC §9)
+#   the u8 config values come from the CLI flags (defaults shown below).
+#
+# The PLAINTEXT password is NEVER present in this file -- only the salt and the salted hash.
+# The runtime namespace `sgate_rt` (att_ct / lock_until) is intentionally NOT written here; the
+# device creates it with a clean, zeroed counter on first boot.
+#
+# Safety clamps the host enforces before EVER emitting these rows (docs/SPEC.md section 4.1):
+#   * max_att MUST be >= 1 (a 0 would arm a wipe with zero failed attempts). provision.py rejects 0.
+#   * The arming pull/level pair MUST be fail-safe: the pin idles toward NOT-ARMED so a cut/floating
+#     wire cannot read ARMED. Fail-safe pairs are arm_level=1 + arm_pull=2 (pulldown) and
+#     arm_level=0 + arm_pull=1 (pullup). provision.py REJECTS the non-fail-safe pairs
+#     (level=1 & pull=1, level=0 & pull=2). The defaults below (arm_level=1, arm_pull=2) are safe.
+#   * cfg_ver is read AND validated by the firmware; an unexpected version is treated as
+#     "not provisioned" (fail-safe -- a schema it doesn't understand can't drive a wipe).
+#
+key,type,encoding,value
+sgate,namespace,,
+cfg_ver,data,u8,1
+salt,data,hex2bin,<SALT_HEX>
+pwhash,data,hex2bin,<PWHASH_HEX>
+kdf_iter,data,u32,<ITER>
+kdf_dklen,data,u8,32
+armed,data,u8,0
+arm_pin,data,u8,27
+arm_level,data,u8,1
+arm_pull,data,u8,2
+deadman,data,u8,1
+max_att,data,u8,2
+wipe_ota,data,u8,1
+wipe_nvs,data,u8,1
+wipe_spiffs,data,u8,1
+wipe_sd,data,u8,1
+brick,data,u8,0
+sd_passes,data,u8,1
