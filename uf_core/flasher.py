@@ -1324,6 +1324,68 @@ class UnleashedProfile(FirmwareProfile):
 
 
 # --------------------------------------------------------------------------- #
+# MinigotchiV3 profile  (dj1ch/minigotchi-V3 — ESP32 Pwnagotchi clone)
+# --------------------------------------------------------------------------- #
+#
+# ESP32 implementation of Pwnagotchi with WiFi frame manipulation and deauth
+# capabilities. Releases ship per-board MERGED single .bin images (flash at 0x0).
+# Supports ESP32 classic and ESP32-S3 boards (Cardputer, CYD, etc.).
+
+_MINIGOTCHI_API = "https://api.github.com/repos/dj1ch/minigotchi-V3/releases/latest"
+_MINIGOTCHI_RE = re.compile(r"\.bin$", re.IGNORECASE)
+
+_MINIGOTCHI_CHIP_MAP = {
+    "cardputer": "esp32s3", "m5cardputer": "esp32s3", "s3": "esp32s3",
+    "cyd": "esp32", "esp32": "esp32", "wroom": "esp32",
+}
+
+
+class MinigotchiV3Profile(FirmwareProfile):
+    id = "minigotchi-v3"
+    label = "MinigotchiV3 (dj1ch)"
+    repo = "dj1ch/minigotchi-V3"
+    supports_suicide = False
+    image_model = IMAGE_MERGED
+
+    def latest_release(self) -> Tuple[str, List[Dict]]:
+        tag, raw = _github_latest(_MINIGOTCHI_API)
+        assets = []
+        for a in raw:
+            name = a.get("name", "")
+            if not _MINIGOTCHI_RE.search(name):
+                continue
+            chip = "esp32"
+            n = name.lower()
+            for frag, c in _MINIGOTCHI_CHIP_MAP.items():
+                if frag in n:
+                    chip = c
+                    break
+            assets.append({
+                "name": name,
+                "url": a.get("browser_download_url"),
+                "chip": chip,
+                "label": f"MinigotchiV3 {name}",
+                "offset": "0x0",
+                "merged": True,
+            })
+        return tag, assets
+
+    def default_variant(self, assets: List[Dict], chip: str) -> Optional[Dict]:
+        cands = self.variants_for_chip(assets, chip)
+        return cands[0] if cands else (assets[0] if assets else None)
+
+    def variants_for_chip(self, assets: List[Dict], chip: str) -> List[Dict]:
+        same = [a for a in assets if a.get("chip") == chip]
+        return same if same else list(assets)
+
+    def support_files(self, chip: str, cache: str, on_line: Line) -> Optional[Dict[str, str]]:
+        return None
+
+    def app_offset(self, chip: str) -> str:
+        return "0x0"
+
+
+# --------------------------------------------------------------------------- #
 # Profile registry
 # --------------------------------------------------------------------------- #
 
@@ -1342,6 +1404,7 @@ PROFILES: Dict[str, FirmwareProfile] = {
         SkySpyProfile(),
         AirTagScannerProfile(),
         CytNgProfile(),
+        MinigotchiV3Profile(),
         MomentumProfile(),
         UnleashedProfile(),
         CustomLocalProfile(),
