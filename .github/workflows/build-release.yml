@@ -31,7 +31,7 @@ jobs:
         run: |
           $tag = "${{ github.event.release.tag_name }}"
           if (-not $tag) { $tag = "dev" }
-          Move-Item dist/headless-marauder.exe "dist/headless-marauder-${tag}-windows-x64.exe"
+          Move-Item dist/universal-flasher.exe "dist/universal-flasher-${tag}-windows-x64.exe"
 
       - name: Upload to release
         if: github.event_name == 'release'
@@ -39,12 +39,50 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = "${{ github.event.release.tag_name }}"
-          gh release upload $tag "dist/headless-marauder-${tag}-windows-x64.exe" --clobber
+          gh release upload $tag "dist/universal-flasher-${tag}-windows-x64.exe" --clobber
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: dist/headless-marauder-*-windows-x64.exe
+          path: dist/universal-flasher-*-windows-x64.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install PyQt5 pyinstaller
+
+      - name: Build binary
+        run: python build.py --onefile
+
+      - name: Rename artifact
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          [ -z "$TAG" ] && TAG="dev"
+          mv dist/universal-flasher "dist/universal-flasher-${TAG}-macos-arm64"
+          chmod +x "dist/universal-flasher-${TAG}-macos-arm64"
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          gh release upload "$TAG" "dist/universal-flasher-${TAG}-macos-arm64" --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist/universal-flasher-*-macos-arm64
 
   build-linux-x64:
     runs-on: ubuntu-22.04
@@ -73,8 +111,8 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name }}"
           [ -z "$TAG" ] && TAG="dev"
-          mv dist/headless-marauder "dist/headless-marauder-${TAG}-linux-x64"
-          chmod +x "dist/headless-marauder-${TAG}-linux-x64"
+          mv dist/universal-flasher "dist/universal-flasher-${TAG}-linux-x64"
+          chmod +x "dist/universal-flasher-${TAG}-linux-x64"
 
       - name: Upload to release
         if: github.event_name == 'release'
@@ -82,12 +120,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          gh release upload "$TAG" "dist/headless-marauder-${TAG}-linux-x64" --clobber
+          gh release upload "$TAG" "dist/universal-flasher-${TAG}-linux-x64" --clobber
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: dist/headless-marauder-*-linux-x64
+          path: dist/universal-flasher-*-linux-x64
 
   build-linux-arm64:
     runs-on: ubuntu-24.04-arm
@@ -114,8 +152,8 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name }}"
           [ -z "$TAG" ] && TAG="dev"
-          mv dist/headless-marauder "dist/headless-marauder-${TAG}-linux-arm64"
-          chmod +x "dist/headless-marauder-${TAG}-linux-arm64"
+          mv dist/universal-flasher "dist/universal-flasher-${TAG}-linux-arm64"
+          chmod +x "dist/universal-flasher-${TAG}-linux-arm64"
 
       - name: Upload to release
         if: github.event_name == 'release'
@@ -123,9 +161,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          gh release upload "$TAG" "dist/headless-marauder-${TAG}-linux-arm64" --clobber
+          gh release upload "$TAG" "dist/universal-flasher-${TAG}-linux-arm64" --clobber
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-arm64
-          path: dist/headless-marauder-*-linux-arm64
+          path: dist/universal-flasher-*-linux-arm64
