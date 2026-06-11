@@ -726,80 +726,93 @@ def validate_args(args):
 # Main
 # ----------------------------------------------------------------------------------------------
 
+def build_bundle(args, pw_buf):
+    """Provisioning CORE (reusable entry point). Hashes `pw_buf` (a bytearray of the plaintext
+    password, which is CONSUMED + ZEROIZED here), bakes guardcfg.bin + (guardian) otadata_blank.bin +
+    bundle.json into args.out, and returns (out_dir, manifest, file_warnings).
+
+    The password is hashed with PBKDF2-HMAC-SHA256 and the buffer zeroized — it is NEVER stored,
+    logged, or placed on argv. Used by main() (which reads the password via getpass) AND by GUI /
+    programmatic callers such as cyber-controller's Suicide setup (which collect the password from a
+    UI field). Callers MUST construct `args` (e.g. via build_arg_parser) and SHOULD pre-validate;
+    validate_args() is also called here as defense-in-depth (SPEC §4.1 clamps)."""
+    validate_args(args)
+
+    # 1) Read offsets/sizes from the partition table (never hardcoded -- SPEC section 2/10).
+    parts = parse_partitions_csv(args.partitions)
+    guardcfg = require_partition(parts, GUARDCFG_PART)
+    otadata = require_partition(parts, OTADATA_PART)
+    if guardcfg["subtype"] != "nvs":
+        raise ProvisionError(
+            "partition %r must have subtype 'nvs' (found %r) -- host + firmware key off this"
+            % (GUARDCFG_PART, guardcfg["subtype"])
+        )
+
+    out_dir = os.path.abspath(args.out)
+    os.makedirs(out_dir, exist_ok=True)
+    guardcfg_bin = os.path.join(out_dir, "guardcfg.bin")
+    otadata_bin = os.path.join(out_dir, "otadata_blank.bin")
+    manifest_path = os.path.join(out_dir, "bundle.json")
+
+    # 2) Hash the password, then ZEROIZE the plaintext immediately. Only salt + pwhash survive.
+    salt = os.urandom(SALT_LEN)
+    with _zeroized(pw_buf):
+        pwhash = derive_pwhash(pw_buf, salt, args.kdf_iter, KDF_DKLEN)
+
+    # 3) Build the NVS CSV (only salt/hash/params + config -- no plaintext) and the image.
+    tmp_dir = tempfile.mkdtemp(prefix="sgate_nvs_")
+    try:
+        nvs_csv = os.path.join(tmp_dir, "nvs_config.csv")
+        rows = build_nvs_rows(args, salt, pwhash)
+        write_nvs_csv(rows, nvs_csv)
+        generate_nvs_bin(nvs_csv, guardcfg_bin, guardcfg["size"], args.nvs_gen_dir)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    # 4) The otadata seed (SPEC section 10): GUARDIAN mints otadata_blank.bin (0xFF); FORK uses the
+    #    build's boot_app0.bin (referenced by the manifest, not minted here).
+    if args.variant == "guardian":
+        write_otadata_blank(otadata_bin, otadata["size"])
+
+    # 5) Bundle manifest: the COMPLETE flash list (SPEC section 10).
+    files, file_warnings = build_manifest_files(args, parts, guardcfg, otadata)
+    manifest = {
+        "schema": "suicide-marauder/bundle@1",
+        "variant": args.variant,
+        "chip": args.chip,
+        "namespace": NVS_NAMESPACE,
+        "cfg_ver": CFG_VERSION,
+        "kdf": {
+            "algo": "pbkdf2-hmac-sha256",
+            "iter": args.kdf_iter,
+            "dklen": KDF_DKLEN,
+            "salt_len": SALT_LEN,
+        },
+        "partitions_csv": os.path.abspath(args.partitions),
+        "bootloader_offset": "0x%X" % bootloader_offset(args.chip),
+        "files": files,
+    }
+    with open(manifest_path, "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2, sort_keys=False)
+        fh.write("\n")
+    return out_dir, manifest, file_warnings
+
+
 def main(argv=None):
     args = build_arg_parser().parse_args(argv)
     try:
         validate_args(args)
 
-        # 1) Read offsets/sizes from the partition table (never hardcoded -- SPEC section 2/10).
-        parts = parse_partitions_csv(args.partitions)
-        guardcfg = require_partition(parts, GUARDCFG_PART)
-        otadata = require_partition(parts, OTADATA_PART)
-        if guardcfg["subtype"] != "nvs":
-            raise ProvisionError(
-                "partition %r must have subtype 'nvs' (found %r) -- host + firmware key off this"
-                % (GUARDCFG_PART, guardcfg["subtype"])
-            )
-
-        out_dir = os.path.abspath(args.out)
-        os.makedirs(out_dir, exist_ok=True)
-        guardcfg_bin = os.path.join(out_dir, "guardcfg.bin")
-        otadata_bin = os.path.join(out_dir, "otadata_blank.bin")
-        manifest_path = os.path.join(out_dir, "bundle.json")
-
-        # 2) Read the password securely, hash it, and ZEROIZE the plaintext immediately.
-        salt = os.urandom(SALT_LEN)
+        # Read the password (getpass — never on argv), then build the bundle (hash + bake guardcfg +
+        # otadata + manifest). build_bundle() consumes + ZEROIZES the password buffer.
         pw_buf = read_password_securely(confirm=not args.no_confirm)
-        with _zeroized(pw_buf):
-            pwhash = derive_pwhash(pw_buf, salt, args.kdf_iter, KDF_DKLEN)
-        # pw_buf is now zeroized. The plaintext is gone; only salt + pwhash remain.
+        out_dir, manifest, file_warnings = build_bundle(args, pw_buf)
         del pw_buf
-
-        # 3) Build the NVS CSV (only salt/hash/params + config -- no plaintext) and the image.
-        #    Write the CSV into a temp dir so it is not left lying around in the bundle.
-        tmp_dir = tempfile.mkdtemp(prefix="sgate_nvs_")
-        try:
-            nvs_csv = os.path.join(tmp_dir, "nvs_config.csv")
-            rows = build_nvs_rows(args, salt, pwhash)
-            write_nvs_csv(rows, nvs_csv)
-            generate_nvs_bin(nvs_csv, guardcfg_bin, guardcfg["size"], args.nvs_gen_dir)
-        finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-
-        # 4) The otadata seed (SPEC section 10): exactly ONE image lands on the otadata offset.
-        #    GUARDIAN -> we MINT otadata_blank.bin (all 0xFF) here. FORK -> the seed is the build's
-        #    boot_app0.bin, so nothing is minted (it is pulled from --build-dir by the manifest).
-        if args.variant == "guardian":
-            write_otadata_blank(otadata_bin, otadata["size"])
-
-        # 5) Bundle manifest: the COMPLETE flash list (SPEC section 10). guardcfg/otadata offsets
-        #    are READ from the CSV (never hardcoded 0xe000); bootloader offset is chip-derived;
-        #    partitions/app are fixed. Build artifacts are copied in from --build-dir when present.
-        files, file_warnings = build_manifest_files(args, parts, guardcfg, otadata)
         for w in file_warnings:
             sys.stderr.write("WARNING: %s\n" % w)
+        files = manifest["files"]
 
-        manifest = {
-            "schema": "suicide-marauder/bundle@1",
-            "variant": args.variant,
-            "chip": args.chip,
-            "namespace": NVS_NAMESPACE,
-            "cfg_ver": CFG_VERSION,
-            "kdf": {
-                "algo": "pbkdf2-hmac-sha256",
-                "iter": args.kdf_iter,
-                "dklen": KDF_DKLEN,
-                "salt_len": SALT_LEN,
-            },
-            "partitions_csv": os.path.abspath(args.partitions),
-            "bootloader_offset": "0x%X" % bootloader_offset(args.chip),
-            "files": files,
-        }
-        with open(manifest_path, "w", encoding="utf-8") as fh:
-            json.dump(manifest, fh, indent=2, sort_keys=False)
-            fh.write("\n")
-
-        # 6) Report. NOTE: salt/hash are device-safe (no plaintext); never print the password.
+        # Report. NOTE: salt/hash are device-safe (no plaintext); never print the password.
         print("Provisioned bundle written to: %s" % out_dir)
         print("  variant=%s chip=%s (bootloader @ %s)"
               % (args.variant, args.chip, manifest["bootloader_offset"]))
