@@ -72,6 +72,13 @@ struct GateConfig {
   uint8_t  wipe_ota = 1, wipe_nvs = 1, wipe_spiffs = 1, wipe_sd = 1;
   uint8_t  brick = 0;                    // T1 default 0; T2 default 1 (SPEC §8)
   uint8_t  sd_passes = 1;
+  uint8_t  flash_passes = 1;             // internal-flash random OVERWRITE passes before the final
+                                         // clean erase. DEFENSE-IN-DEPTH ONLY: a single NOR erase is
+                                         // forensically sufficient (no remanence — RESEARCH-DIGEST),
+                                         // so 0 = erase-only is the reliability-first choice and >1
+                                         // adds brownout exposure with no NOR benefit. fast_wipe AND
+                                         // the resume path force 0. The final erase is load-bearing.
+  uint8_t  fast_wipe = 0;                // 1: skip SD, only flash erase + boot brick (brownout-safe)
 
   // Load from `sgate` NVS namespace. Missing pwhash => provisioned=false (cannot wipe).
   static GateConfig load();
