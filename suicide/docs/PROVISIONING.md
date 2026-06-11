@@ -60,8 +60,11 @@ encryption + an `nvs_keys` partition (a T2 option, SPEC §4 note) — out of sco
 
 `provision.py` collects the parameters below (password via `getpass`; everything else via flags or
 prompts), generates an `nvs_config.csv` in NVS-partition-generator format (`key,type,encoding,value`,
-namespace row `sgate,namespace,,` then `sgate_rt,namespace,,`), and runs `nvs_partition_gen generate`
-to produce **`guardcfg.bin`** sized to the `guardcfg` partition (0x2000 on 4 MB).
+namespace row `sgate,namespace,,` followed by the `sgate` keys — the host writes **only** the `sgate`
+namespace; `sgate_rt` is created by the firmware at runtime, never by the host), and runs
+`nvs_partition_gen generate` to produce **`guardcfg.bin`** sized to the `guardcfg` partition (0x3000 on
+4 MB — the 3-sector / 12 KiB minimum for a **read/write** NVS partition; `provision.py` rejects a
+smaller `guardcfg`).
 
 Canonical `sgate` keys (defaults from SPEC §4 — change deliberately, per device):
 
@@ -84,10 +87,15 @@ Canonical `sgate` keys (defaults from SPEC §4 — change deliberately, per devi
 | `wipe_sd` | u8 | overwrite + erase SD | `1` |
 | `brick` | u8 | erase boot chain last (true brick) | `0` (T1) / `1` (T2) |
 | `sd_passes` | u8 | SD overwrite passes | `1` |
+| `flash_passes` | u8 | internal-flash random overwrite passes before the clean erase (defense-in-depth) | `1` |
+| `fast_wipe` | u8 | 1=skip SD, flash erase + boot brick only (brownout-safe) | `0` |
 
-`sgate_rt` (`att_ct`, `lock_until`) is left at defaults; the firmware manages it at runtime. Keeping
-config and counter in separate namespaces means re-provisioning config does not reset the attempt
-counter (SPEC §4).
+`sgate_rt` (`att_ct`, `lock_until`, `wipe_armed`, `resume_count`) is **not** written by the host; the
+firmware mints and manages it at runtime. The namespaces are separate so the *firmware* never resets
+the counter when it rewrites config — **but** `guardcfg.bin` is a WHOLE-PARTITION image, so
+(re)flashing it with the documented `esptool write_flash` erases the entire `guardcfg` partition
+including `sgate_rt`, which **does reset `att_ct` to 0**. Treat re-provisioning as a fresh start; the
+lockout counter is not preserved across a reflash (SPEC §4).
 
 > **Choosing `arm_pin`:** never a strapping pin. Classic ESP32 / Lonely Binary Gold → GPIO27; S3
 > (Cardputer/Mini) → Grove **G2**; C3 → GPIO10 (SPEC §7). GPIO34–39 are **input-only** and need an

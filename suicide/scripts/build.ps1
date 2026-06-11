@@ -68,7 +68,11 @@ if ($Safe) {
 
 switch ($Input) {
   'serial'    { $Defs.Add('-DGATE_INPUT_SERIAL') }
-  'touch'     { $Defs.Add('-DGATE_INPUT_TOUCH') }
+  # touch reuses Marauder's real touch_keyboard_obj (TouchKeyboard.h); GateInput_touch.cpp #errors
+  # without SUICIDE_HAVE_TOUCH_KEYBOARD_OBJ. Correct here because this builds the FORK against the
+  # Marauder source. (If your Marauder revision renames the instance, override the shim per
+  # firmware/integration/INTEGRATION.md rather than dropping the define.)
+  'touch'     { $Defs.Add('-DGATE_INPUT_TOUCH'); $Defs.Add('-DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ') }
   'mini_kb'   { $Defs.Add('-DGATE_INPUT_MINI_KB') }
   'cardputer' { $Defs.Add('-DGATE_INPUT_CARDPUTER') }
   'buttons'   { $Defs.Add('-DGATE_INPUT_BUTTONS') }

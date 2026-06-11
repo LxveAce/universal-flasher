@@ -116,8 +116,16 @@ Roomy; full spiffs + larger guardcfg + coredump.
 
 ## 4. `guardcfg` NVS schema (canonical)
 
-Namespace **`sgate`** (config) and **`sgate_rt`** (runtime counter, kept separate so config can be
-rewritten without resetting the attempt counter).
+Namespace **`sgate`** (config, written by the host) and **`sgate_rt`** (runtime counter, minted by
+the firmware). They are separate NVS namespaces so the **firmware** never resets the attempt counter
+when it rewrites config at runtime.
+
+> **Re-provisioning DOES reset the attempt counter.** The host emits a *whole-partition* `guardcfg.bin`
+> (sized to the `guardcfg` partition), so (re)flashing it with the documented single `esptool
+> write_flash` erases the **entire** `guardcfg` partition — including the co-located `sgate_rt`
+> namespace — and therefore zeroes `att_ct`/`lock_until`/`wipe_armed`. Treat re-provisioning as a
+> fresh start; the lockout counter is not preserved across a reflash. (The host writes only the
+> `sgate` namespace; `sgate_rt` is created and maintained by the firmware at runtime.)
 
 ### Namespace `sgate`
 | Key | Type | Meaning | Default |

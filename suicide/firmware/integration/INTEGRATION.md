@@ -357,8 +357,14 @@ Boot/FE in the IDF/menuconfig sidecar (arduino-cli surfaces these via board menu
 `sdkconfig` only on the IDF-component path; for pure Arduino, T2 eFuse steps are done with
 `espefuse.py`/`idf.py` separately — see SPEC §11 and the flasher's T2 warning).
 
-A touch board (CYD) swaps the input flag and partition only:
-`-DGATE_INPUT_TOUCH` with the same `suicide_4MB.csv`.
+A touch board (CYD) swaps the input flag and partition: use `suicide_4MB.csv` and
+**both** `-DGATE_INPUT_TOUCH -DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ`. The second define is required —
+`GateInput_touch.cpp` binds to Marauder's real `touch_keyboard_obj` (`TouchKeyboard.h`) and emits a
+hard `#error` without it, so a touch build can never silently link the wrong/absent keyboard symbol.
+It is correct here because the FORK builds against the Marauder source (which provides
+`touch_keyboard_obj`). If your Marauder revision names the global differently, override the one-line
+shim in `GateInput_touch.cpp` (see §2 keyboard wiring) rather than dropping the define. The CYD
+on-screen keypad masks the password; nothing is echoed to serial.
 
 ---
 

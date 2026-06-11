@@ -46,3 +46,5 @@ wipe_spiffs,data,u8,1
 wipe_sd,data,u8,1
 brick,data,u8,0
 sd_passes,data,u8,1
+flash_passes,data,u8,1
+fast_wipe,data,u8,0

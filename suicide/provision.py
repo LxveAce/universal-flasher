@@ -231,14 +231,59 @@ def read_password_securely(confirm=True):
         pw2 = None
     buf = bytearray(pw1.encode("utf-8"))
     pw1 = None
+    validate_password(buf)  # reject >63 bytes / leading-ws / `unlock ` BEFORE we proceed (clear error)
     return buf
+
+
+# Firmware secret buffer is char[64] (GateInput.h) -> 63 usable bytes. Every GATE_INPUT_* adapter
+# clamps a longer secret to 63 bytes BEFORE hashing, so the host MUST reject anything longer or the
+# owner's correct password would never validate on-device (and on an ARMED board the correct password
+# would be counted as a failed attempt and trigger the wipe). Mirror that bound here (SPEC §4/§5).
+SUICIDE_PW_MAX_BYTES = 63
 
 
 def derive_pwhash(pw_bytes, salt, iterations, dklen=KDF_DKLEN):
     """PBKDF2-HMAC-SHA256(password, salt, iterations, dklen). Matches GateCrypto.derive()."""
+    # The device stores kdf_iter as an NVS u32 and re-derives with a 32-bit count; reject an out-of-
+    # range iteration count here so the host and the device can never hash with a different value.
+    if not (1 <= iterations <= 0xFFFFFFFF):
+        raise ProvisionError("iterations must be in [1, 0xFFFFFFFF] (device stores kdf_iter as NVS u32)")
     # bytes(pw_bytes) copies into an immutable buffer for hashlib; the source bytearray remains
     # the caller's responsibility to zeroize.
     return hashlib.pbkdf2_hmac("sha256", bytes(pw_bytes), salt, iterations, dklen)
+
+
+def validate_password(pw_bytes):
+    """Reject any password the firmware would hash DIFFERENTLY than the host, turning a silent on-
+    device lockout / armed-board self-wipe into a clear provisioning-time error. `pw_bytes` is the
+    UTF-8 password bytes (bytes/bytearray). Raises ProvisionError; returns None on success.
+
+    Each check mirrors a firmware-side normalization so the hashed bytes are identical across EVERY
+    GATE_INPUT_* method (serial/touch/mini/cardputer/buttons): non-empty; <= 63 UTF-8 bytes (the
+    char[64] clamp); no leading/trailing ASCII whitespace and no leading `unlock `/`unlock\\t` keyword
+    (the serial adapter strips these before hashing — GateInput_serial.cpp)."""
+    n = len(pw_bytes)
+    if n == 0:
+        raise ProvisionError("empty password rejected")
+    if n > SUICIDE_PW_MAX_BYTES:
+        raise ProvisionError(
+            "password is %d UTF-8 bytes; the firmware secret buffer is char[64] and clamps to %d "
+            "bytes before hashing, so a longer password could NEVER validate on-device (and on an "
+            "ARMED board the correct password would be counted as a failed attempt and trigger the "
+            "wipe). Choose a passphrase of <= %d UTF-8 bytes."
+            % (n, SUICIDE_PW_MAX_BYTES, SUICIDE_PW_MAX_BYTES)
+        )
+    if pw_bytes[0] in (0x20, 0x09) or pw_bytes[n - 1] in (0x20, 0x09):
+        raise ProvisionError(
+            "password has leading/trailing whitespace; the serial input adapter strips it before "
+            "hashing, so the password would not validate on-device over serial. Remove the "
+            "surrounding whitespace."
+        )
+    if bytes(pw_bytes[:7]).lower() in (b"unlock ", b"unlock\t"):
+        raise ProvisionError(
+            "password begins with the reserved serial keyword `unlock ` (the serial adapter strips "
+            "this prefix before hashing). Choose a password that does not start with `unlock `."
+        )
 
 
 # ----------------------------------------------------------------------------------------------
@@ -685,6 +730,13 @@ def build_arg_parser():
 def validate_args(args):
     if args.kdf_iter < 1:
         raise ProvisionError("--kdf-iter must be >= 1")
+    if args.kdf_iter > 0xFFFFFFFF:
+        raise ProvisionError(
+            "--kdf-iter must be <= 4294967295 (0xFFFFFFFF): it is stored as an NVS u32 and the device "
+            "re-derives with a 32-bit iteration count, so a larger value would make the host hash with "
+            "the full count while the device wraps to the low 32 bits -> the correct password would "
+            "never validate on-device."
+        )
     # max_att MUST be >= 1, always (SPEC section 4.1 fail-closed clamp). A max_att of 0 would mean
     # "wipe on the zeroth attempt", i.e. wipe before any password is even tried -- the firmware
     # treats a stored 0 as the safe default, but the host must never *emit* a 0 in the first place.
@@ -750,6 +802,7 @@ def build_bundle(args, pw_buf):
     UI field). Callers MUST construct `args` (e.g. via build_arg_parser) and SHOULD pre-validate;
     validate_args() is also called here as defense-in-depth (SPEC §4.1 clamps)."""
     validate_args(args)
+    validate_password(pw_buf)  # parity guard: reject >63 bytes / leading-ws / `unlock ` (all callers)
 
     # 1) Read offsets/sizes from the partition table (never hardcoded -- SPEC section 2/10).
     parts = parse_partitions_csv(args.partitions)

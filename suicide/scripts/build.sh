@@ -97,7 +97,9 @@ else
 fi
 case "$INPUT" in
   serial)    DEFS+=("-DGATE_INPUT_SERIAL");;
-  touch)     DEFS+=("-DGATE_INPUT_TOUCH");;
+  # touch needs SUICIDE_HAVE_TOUCH_KEYBOARD_OBJ to bind Marauder's real touch_keyboard_obj
+  # (GateInput_touch.cpp #errors without it). Correct here: the FORK builds against Marauder source.
+  touch)     DEFS+=("-DGATE_INPUT_TOUCH" "-DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ");;
   mini_kb)   DEFS+=("-DGATE_INPUT_MINI_KB");;
   cardputer) DEFS+=("-DGATE_INPUT_CARDPUTER");;
   buttons)   DEFS+=("-DGATE_INPUT_BUTTONS");;

@@ -99,6 +99,12 @@ build_flags =
 ; ==============================================================================================
 ; CYD 2.8"/3.5" (Cheap Yellow Display) — 4 MB, resistive/capacitive touch (HAS_TOUCH).
 ; Reuses Marauder's keyboardInput() on-screen keypad. arm_pin: GPIO27 or a broken-out CN1/P3 pin.
+;
+; GATE_INPUT_TOUCH REQUIRES -DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ too: GateInput_touch.cpp binds to
+; Marauder's real `touch_keyboard_obj` (TouchKeyboard.h) and #errors without this define so a build
+; can never silently link the wrong/absent keyboard symbol. It is correct HERE because the FORK builds
+; against the Marauder source (which provides touch_keyboard_obj). If your Marauder revision names the
+; instance differently, override the shim per INTEGRATION.md instead of dropping the define.
 ; ==============================================================================================
 [env:cyd_touch_safe]
 extends = gate_base
@@ -108,7 +114,7 @@ board_upload.flash_size = 4MB
 build_flags =
     ${gate_base.build_flags}
     ${gate_safe.build_flags}
-    -DGATE_INPUT_TOUCH
+    -DGATE_INPUT_TOUCH -DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ
     -DARMING_PIN=27 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
 
 [env:cyd_touch_t1]
@@ -119,7 +125,7 @@ board_upload.flash_size = 4MB
 build_flags =
     ${gate_base.build_flags}
     ${gate_t1.build_flags}
-    -DGATE_INPUT_TOUCH
+    -DGATE_INPUT_TOUCH -DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ
     -DARMING_PIN=27 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
 
 ; ==============================================================================================
