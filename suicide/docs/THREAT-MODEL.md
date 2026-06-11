@@ -164,3 +164,19 @@ The design deliberately biases away from accidental destruction:
   Accepted limit, not solved.
 - Compelled-password law varies by jurisdiction; the duress feature is a personal-risk decision.
 - The boot-chain self-erase ("brick") is unverified until the hardware spike passes.
+- **T1 leaves the running app image — "data-wiped" is not "trace-free".** Stage 2 cannot erase the
+  *currently-running* app partition (doing so crashes the CPU mid-wipe), so on a T1 (`brick=0`) board
+  the firmware **binary survives** a successful wipe: on FORK that is the Marauder image with the
+  compiled-in `BootGate`/`SelfDestruct`/`GateCrypto` code; on **GUARDIAN** it is the whole `factory`
+  gate image (`wipeInternal` now enumerates `factory`, but when factory IS the running gate it is
+  deferred to the brick stage). A chip dump therefore still reveals "this device ran anti-forensic
+  duress firmware." **Trace-free operation requires `brick=1` (or T2 Flash Encryption making the image
+  ciphertext).** Do not read "data-wiped" as "no recoverable trace" on T1.
+- **RTC slow memory / PSRAM are out of scope of the flash wipe.** The flash scrub does not clear RTC
+  RAM (survives some resets / deep sleep) or PSRAM. The plaintext password buffer is zeroized in
+  `BootGate`, and `SelfDestruct::trigger` now volatile-zeros the in-RAM `salt`+`pwhash` before the
+  halt/brick, but any key material that *transited* PSRAM or RTC RAM is only guaranteed gone on
+  power-off. Power the board off after a T1 wipe.
+- **The wipe overwrite is defense-in-depth, not the guarantee.** A single NOR erase is forensically
+  sufficient (no remanence); `flash_passes` random overwrite is optional polish that the `fast_wipe`
+  and resume paths skip for reliability. The load-bearing step is the final erase + raw-read verify.

@@ -51,8 +51,11 @@
 #include "esp_log.h"
 #include "esp_system.h"   // esp_reset_reason()
 #include "esp_sleep.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 // adc battery read is board-specific; we only need a coarse "is the supply too low to trust the
-// arming line / NVS write" signal. Provided via the weak hook below.
+// arming line / NVS write" signal. Provided via the weak hook below. Enhanced with optional
+// ADC-based supply voltage check (define SUPPLY_ADC_PIN + SUPPLY_ADC_THRESHOLD_MV at build time).
 #endif
 
 namespace suicide {
@@ -77,16 +80,72 @@ void scrubConfigSecrets(GateConfig& cfg) {
 // We deliberately FAIL TOWARD DISARMED (never wipe) when the supply is questionable: a brown-out
 // boot is far more likely a flaky battery/USB than a genuine duress event, and wiping on a flaky
 // rail risks a half-completed erase. A board package can override gateSupplyIsLow() (declared weak)
-// with a real fuel-gauge / ADC reading. Default: only a hardware BROWNOUT reset counts as "low".
+// with a real fuel-gauge / ADC reading. Default: uses hardware brownout reset detection AND an
+// ADC-based supply voltage check when a voltage divider is wired to SUPPLY_ADC_PIN.
+//
+// Brownout events are logged to NVS (sgate_rt.brownout_count) so the operator can see how often
+// the device experienced low-voltage conditions.
 // ---------------------------------------------------------------------------------------------
+
+// ADC-based supply voltage check. Boards with a voltage divider from VIN/VBAT to an ADC-capable
+// pin can define SUPPLY_ADC_PIN and SUPPLY_ADC_THRESHOLD_MV. The threshold is the raw ADC reading
+// (in mV after attenuation) below which the supply is considered too low for a reliable wipe.
+// Default: disabled (no pin defined). Classic ESP32 ADC1 pins (GPIO32-39) are suitable.
+#ifndef SUPPLY_ADC_PIN
+// No ADC pin configured — ADC voltage check disabled by default. To enable, define in the build:
+//   -DSUPPLY_ADC_PIN=34 -DSUPPLY_ADC_THRESHOLD_MV=2800
+#endif
+
+#ifndef SUPPLY_ADC_THRESHOLD_MV
+#define SUPPLY_ADC_THRESHOLD_MV 2800  // ~2.8V at the ADC pin suggests supply below ~3.0V
+#endif
+
+// Log a brownout event to NVS for operator visibility. The counter is monotonic and never reset
+// by normal operation — the operator can read it via SM_INFO to see how many brownout boots
+// occurred. Under SAFE_MODE this is a log-only no-op.
+void logBrownoutEvent() {
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUICIDE_SAFE_MODE)
+  ESP_LOGW(TAG, "[SAFE] would log brownout event to NVS — NO-OP");
+#else
+  nvs_handle_t h;
+  if (nvs_open_from_partition("guardcfg", NVS_NS_RT, NVS_READWRITE, &h) == ESP_OK) {
+    uint8_t count = 0;
+    nvs_get_u8(h, "bo_count", &count);
+    if (count < 0xFF) count++;
+    nvs_set_u8(h, "bo_count", count);
+    nvs_commit(h);
+    nvs_close(h);
+    ESP_LOGW(TAG, "brownout event logged to NVS (bo_count=%u)", (unsigned)count);
+  }
+#endif
+#endif
+}
+
 bool defaultSupplyIsLow() {
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-  // A brownout reset is the one reset cause that unambiguously means the rail sagged below the
-  // detector threshold on the previous power event. Treat that boot as untrusted => DISARMED.
+  // Check 1: a brownout reset is the one reset cause that unambiguously means the rail sagged
+  // below the detector threshold on the previous power event.
   esp_reset_reason_t r = esp_reset_reason();
   if (r == ESP_RST_BROWNOUT) {
+    logBrownoutEvent();
     return true;
   }
+
+  // Check 2: ADC-based supply voltage check (when configured). Read the ADC pin and compare
+  // against the threshold. This catches a low-but-not-brownout condition where the supply is
+  // marginal (e.g. a dying battery that hasn't quite triggered the hardware brownout detector).
+#if defined(SUPPLY_ADC_PIN)
+  // Use the Arduino analogRead with 11dB attenuation for the widest range (~0-3.3V).
+  analogSetPinAttenuation(SUPPLY_ADC_PIN, ADC_11db);
+  uint32_t reading_mv = analogReadMilliVolts(SUPPLY_ADC_PIN);
+  if (reading_mv > 0 && reading_mv < SUPPLY_ADC_THRESHOLD_MV) {
+    ESP_LOGW(TAG, "ADC supply check: %u mV < threshold %u mV — treating as low supply",
+             (unsigned)reading_mv, (unsigned)SUPPLY_ADC_THRESHOLD_MV);
+    logBrownoutEvent();
+    return true;
+  }
+#endif
 #endif
   return false;
 }

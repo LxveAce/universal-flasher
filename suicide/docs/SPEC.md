@@ -131,6 +131,7 @@ rewritten without resetting the attempt counter).
 | `wipe_sd` | u8 | best-effort SD file + free-space overwrite (no guaranteed format — see §8) | `1` |
 | `brick` | u8 | erase boot chain last (true brick) | `0` (T1) / `1` (T2) |
 | `sd_passes`| u8 | SD overwrite passes | `1` |
+| `flash_passes`| u8 | internal-flash random OVERWRITE passes before the final clean erase (§8); `0`=erase-only; `fast_wipe` forces `0` | `1` |
 
 ### Namespace `sgate_rt`
 | Key | Type | Meaning |
@@ -268,23 +269,35 @@ There is **no runtime crypto-erase on ESP32** (AES key eFuse is HW read+write-pr
 bulk erase + overwrite. Non-abortable once started. Under `SUICIDE_SAFE_MODE`, every step targets a
 scratch partition / logs only.
 
-1. **SD** (if `wipe_sd` & card present): the stock-SD path (`SelfDestruct.cpp` `wipeSDImpl`) does a
-   **best-effort file-level overwrite only** — recursively overwrite every file's contents with
-   `esp_fill_random` (`sd_passes` passes) and delete it, then a **single** pass over remaining free
-   space (fill one big random temp file until the card is full, then delete it). **There is NO
-   guaranteed card erase / FAT reformat / full-LBA secure-erase on this path** — `SD.end()` only
-   drops our open handles. A true full-LBA erase + reformat needs a **raw-sector backend (SdFat)**
-   supplied via the weak `wipeSDImpl` board override → **TODO** (RESEARCH-DIGEST.md). Even the
-   file+free-space overwrite is **best-effort**: FTL wear-leveling / over-provisioning means
-   remapped or spare cells may survive; this is documented, not hidden. At-rest SD encryption (T2)
-   is the only real guarantee.
-2. **Internal data**: `esp_partition_erase_range` over `ota_0` (Marauder app, if `wipe_ota`),
-   `spiffs` (if `wipe_spiffs`), Marauder `nvs` (if `wipe_nvs`), coredump, then `guardcfg` **last of
-   the data** (after config is already in RAM).
+1. **SD** (if `wipe_sd` & card present, and not `fast_wipe`): `wipeSDImpl` attempts a **full-LBA
+   raw-sector wipe** first (forensic-grade) — via the SDMMC host driver it writes every sector from
+   LBA 0 to the last, bypassing the filesystem (`sd_passes >= 2` = random pass(es) then a final zero
+   pass; `1` = zeros). If raw access is unavailable (SPI-only SD, no SDMMC host, init failure) it
+   **falls back** to a file-level overwrite (`esp_fill_random`, `sd_passes` passes) + a free-space
+   fill. The raw path is forensic-grade for the addressable LBA range; both paths remain subject to
+   **FTL** wear-leveling / over-provisioning (remapped or spare cells may survive) — documented, not
+   hidden. At-rest SD encryption (T2) is the only absolute guarantee.
+2. **Internal data — OVERWRITE-then-ERASE + verify** (red-team / "write over all deleted items"):
+   for `ota_0`/`ota_1`/`factory` (non-running app slots, if `wipe_ota`), `spiffs` (if `wipe_spiffs`),
+   Marauder `nvs` (if `wipe_nvs`), `coredump`, `otadata`, `nvs_keys` (T2 NVS key — else a dumped NVS
+   could be decrypted), `scratch` (the SAFE dry-run region), then `guardcfg` **last**.
+   - **The load-bearing step is the final `esp_partition_erase_range` to 0xFF.** On NOR flash a single
+     erase is **forensically sufficient** (no magnetic remanence — RESEARCH-DIGEST). The optional
+     `flash_passes` random overwrite passes (`erase → esp_partition_write(esp_fill_random)` → final
+     erase) are **defense-in-depth only** ("write over deleted items"); they add power-loss exposure
+     with no NOR benefit, so `fast_wipe` **and the resume path force 0 passes**, and `flash_passes=0`
+     (erase-only) still fully meets the no-trace bar.
+   - **Verification reads RAW flash** via `esp_flash_read` (not `esp_partition_read`), so an erased
+     0xFF sector verifies correctly even on a **flash-encrypted (T2)** partition — `esp_partition_read`
+     would transparently *decrypt* 0xFF into non-0xFF and falsely report failure.
+   - A failed erase/verify is **not** counted as complete — the tombstone stays set and the next boot
+     retries (erase-only + SD-skipped, so a resume converges within the `MAX_WIPE_RESUMES` budget).
 3. **Brick** (if `brick`): from an `IRAM_ATTR` routine that does not return to flash — raw-erase the
    partition table (0x8000), the bootloader (0x1000 classic / 0x0 S3-C3), and the running app/factory
    region. **This self-erase-of-the-running-app is the one UNVERIFIED primitive** → see
-   `docs/SPIKE-PLAN.md`; requires `CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y`.
+   `docs/SPIKE-PLAN.md`; requires `CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y`. (The brick leaves a
+   blank chip = no trace; per-region overwrite is intentionally NOT added here to keep the fragile,
+   cache-disabled IRAM window minimal — the overwrite guarantee applies to the Stage-2 data path.)
 
 T1 (`brick=0`) leaves a re-flashable but data-wiped board. T2 (`brick=1` + Secure Boot/FE) leaves an
 unrecoverable board whose ciphertext is gone.
