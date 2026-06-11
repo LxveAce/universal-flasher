@@ -75,16 +75,24 @@ Does **not** fit in 4 MB (two ~1.875 MB app slots + filesystems overflow 4 MB �
 Partition names are canonical. Data partition `guardcfg` (subtype `nvs`) holds the gate config.
 
 ### 3.1 FORK on 4 MB (classic ESP32 / CYD) — `firmware/partitions/suicide_4MB.csv`
-Derived from Marauder's `min_spiffs`, carving an 8 KB `guardcfg` out of spiffs. On 4 MB the second
+Derived from Marauder's `min_spiffs`, carving a 12 KB `guardcfg` out of spiffs. On 4 MB the second
 app slot is dropped (Marauder's SD-OTA-self-update is disabled on this build — documented trade).
+
+> **`guardcfg` must be ≥ `0x3000` (3 sectors / 12 KiB)** — the ESP-IDF minimum for a **read/write**
+> NVS partition. The gate persists its runtime counter (`sgate_rt`: `att_ct`/`lock_until`/
+> `wipe_armed`) in this same partition, so it must be read/write. A smaller `guardcfg` makes
+> `nvs_partition_gen` emit a tiny **read-only** image and makes the firmware's read/write
+> `nvs_flash_init_partition("guardcfg")` fail → `provisioned=false` → **the password gate never
+> activates**. `provision.py` enforces this floor. (Here `guardcfg` grows to `0x3000` and `spiffs`
+> shrinks by `0x1000`, so `coredump`/`scratch` keep their canonical offsets.)
 
 ```
 # Name,    Type, SubType, Offset,   Size,     Flags
 nvs,       data, nvs,     0x9000,   0x5000,
 otadata,   data, ota,     0xe000,   0x2000,
 app0,      app,  ota_0,   0x10000,  0x1E0000,
-guardcfg,  data, nvs,     0x1F0000, 0x2000,
-spiffs,    data, spiffs,  0x1F2000, 0xC000,
+guardcfg,  data, nvs,     0x1F0000, 0x3000,
+spiffs,    data, spiffs,  0x1F3000, 0xB000,
 coredump,  data, coredump,0x1FE000, 0x2000,
 scratch,   data, 0x40,    0x200000, 0x10000,
 ```

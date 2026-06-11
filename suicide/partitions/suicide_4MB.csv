@@ -1,7 +1,7 @@
 # suicide_4MB.csv — FORK variant, classic ESP32 / CYD, 4 MB flash (0x400000)
 #
 # CANONICAL: this file is the committed reference table in docs/SPEC.md §3.1 and MUST match it
-# byte-for-byte. Derived from arduino-esp32 min_spiffs.csv, carving an 8 KB `guardcfg` (subtype
+# byte-for-byte. Derived from arduino-esp32 min_spiffs.csv, carving a 12 KB `guardcfg` (subtype
 # nvs) out of the tail and DROPPING the second app slot (ota_1). On 4 MB there is no room for two
 # ~1.875 MB app slots plus guardcfg + spiffs + coredump, so Marauder's SD-OTA self-update is
 # disabled on this build (documented trade-off — see README.md). Bootloader @0x1000 (classic
@@ -13,11 +13,17 @@
 # `scratch` partition is present, and NEVER falls back to a live partition. With scratch added the
 # 0x200000-0x210000 window is now allocated; everything above 0x210000 stays reserved/unused.
 #
+# `guardcfg` MUST be >= 0x3000 (3 sectors / 12 KiB): that is the ESP-IDF minimum for a READ/WRITE
+# NVS partition. The gate stores its runtime counter (sgate_rt: att_ct/lock_until/wipe_armed) in this
+# same partition, so it MUST be read/write. A smaller guardcfg makes nvs_partition_gen emit a tiny
+# READ-ONLY image and makes the firmware's nvs_flash_init_partition("guardcfg") fail -> provisioned=
+# false -> the password gate never activates. Do NOT shrink below 0x3000 (provision.py also enforces).
+#
 # Name,    Type, SubType, Offset,   Size,     Flags
 nvs,       data, nvs,     0x9000,   0x5000,
 otadata,   data, ota,     0xe000,   0x2000,
 app0,      app,  ota_0,   0x10000,  0x1E0000,
-guardcfg,  data, nvs,     0x1F0000, 0x2000,
-spiffs,    data, spiffs,  0x1F2000, 0xC000,
+guardcfg,  data, nvs,     0x1F0000, 0x3000,
+spiffs,    data, spiffs,  0x1F3000, 0xB000,
 coredump,  data, coredump,0x1FE000, 0x2000,
 scratch,   data, 0x40,    0x200000, 0x10000,

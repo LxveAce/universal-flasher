@@ -351,6 +351,19 @@ def generate_nvs_bin(csv_path, out_bin, size_bytes, nvs_gen_dir=None):
         raise ProvisionError(
             "guardcfg partition size %s is not a multiple of 0x1000 (4096)" % size_hex
         )
+    # READ/WRITE NVS minimum is 0x3000 (3 sectors / 12 KiB). Below this, nvs_partition_gen silently
+    # emits a smaller READ-ONLY image, and on-device the firmware's read/write
+    # nvs_flash_init_partition("guardcfg") fails (the gate also persists its sgate_rt counter there),
+    # so the board reads as provisioned=false and the password gate NEVER activates. Reject loudly
+    # rather than mint a guardcfg image that can't drive the gate. (See firmware/partitions/*.csv.)
+    if size_bytes < 0x3000:
+        raise ProvisionError(
+            "guardcfg partition size %s is below the read/write NVS minimum of 0x3000 (12 KiB / 3 "
+            "sectors). A smaller partition yields a READ-ONLY NVS image and the firmware's "
+            "read/write nvs_flash_init_partition(\"guardcfg\") would fail -> the gate could never "
+            "read its config or store its attempt counter (the password gate would never activate). "
+            "Grow `guardcfg` to >= 0x3000 in the partitions CSV." % size_hex
+        )
 
     if kind == "script":
         cmd = [
