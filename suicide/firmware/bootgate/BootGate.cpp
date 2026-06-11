@@ -279,8 +279,6 @@ GateResult BootGate::armedFlow(GateConfig& cfg, bool lowSupply) {
     // SPEC §4.1 / §6: att_ct == 0 NEVER triggers (no failed attempt => no wipe), regardless of
     // max_att. We only reach the trigger after at least one real wrong attempt (att_ct >= 1).
     if (rt.att_ct != 0 && rt.att_ct >= cfg.max_att) {
-      // Tell the input layer it is locked (cosmetic).
-      Input::notifyLocked(0);
       if (lowSupply) {
         // Brownout-suppression (SPEC §13): a flaky rail must NEVER cause a wipe. We do NOT
         // SelfDestruct. Instead we LOCK and KEEP RE-PROMPTING forever — the CORRECT password (handled
@@ -288,11 +286,14 @@ GateResult BootGate::armedFlow(GateConfig& cfg, bool lowSupply) {
         // att_ct stays at/above max_att, so a later boot on a HEALTHY supply will enforce the real
         // REASON_ATTEMPTS policy. We deliberately fall through to the re-prompt (no return, no
         // trigger) rather than halting hard, so a correct password can still rescue the boot.
+        Input::notifyLocked(0);  // cosmetic — ONLY on the low-supply LOCK path, never before a wipe
         ESP_LOGW(TAG, "low-supply boot: max_att reached -> LOCK, re-prompting forever (NO wipe; "
                       "correct password still boots) — reliability-first (SPEC §13)");
         backoff(rt.att_ct);
         continue;  // re-prompt; never SelfDestruct on a low-supply boot
       }
+      // Good supply: TRIGGER. Do NOT telegraph it — never signal an imminent wipe before the data is
+      // gone (red-team; panicIndicate runs AFTER the destructive work in SelfDestruct::trigger).
       ESP_LOGW(TAG, "wrong-password count %u reached max_att %u -> REASON_ATTEMPTS",
                (unsigned)rt.att_ct, (unsigned)cfg.max_att);
       SelfDestruct::trigger(cfg, REASON_ATTEMPTS);
