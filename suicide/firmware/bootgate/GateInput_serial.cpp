@@ -25,6 +25,15 @@
 #include <Arduino.h>
 #include <string.h>
 
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#include "nvs_flash.h"
+#include "nvs.h"
+#endif
+
+#if !defined(SUICIDE_NO_SD)
+#include <SD.h>
+#endif
+
 namespace suicide {
 
 namespace {
@@ -41,8 +50,12 @@ void secureZero(void* p, size_t n) {
   while (n--) *v++ = 0;
 }
 
+}  // namespace (close anonymous namespace so startsWithCmd is accessible from dashboard namespace)
+
 // Case-insensitive prefix check for the command keyword (commands are ASCII, lowercase expected).
-bool startsWithCmd(const char* line, const char* cmd, size_t cmdLen) {
+// Placed at file scope (not in an anonymous namespace) so both the anonymous helpers and the
+// dashboard namespace can use it.
+static bool startsWithCmd(const char* line, const char* cmd, size_t cmdLen) {
   for (size_t i = 0; i < cmdLen; ++i) {
     char c = line[i];
     if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
@@ -50,6 +63,8 @@ bool startsWithCmd(const char* line, const char* cmd, size_t cmdLen) {
   }
   return true;
 }
+
+namespace {  // re-open anonymous namespace for the remaining helpers
 
 // Read one CR/LF-terminated line into `out` (NUL-terminated), returning length or -1 on timeout.
 // Does NOT echo bytes. Backspace (0x08/0x7F) edits the in-RAM line so a typo doesn't leak as a wrong
@@ -105,6 +120,9 @@ size_t extractSecret(const char* trimmed, InputResult& r) {
 
 }  // namespace
 
+// Firmware version for SM_INFO responses. Updated with each release.
+static constexpr const char* SM_FW_VERSION = "1.1.0";
+
 void Input::begin(const GateConfig& /*cfg*/) {
   if (!Serial) Serial.begin(kBaud);
   // Brief, non-secret prompt. Never hints whether the board is provisioned/armed beyond this.
@@ -112,7 +130,161 @@ void Input::begin(const GateConfig& /*cfg*/) {
   Serial.println(F("suicide-gate: enter `unlock <password>` (or just the password). `wipe` to erase."));
 }
 
-InputResult Input::getPassword(const GateConfig& /*cfg*/) {
+// ---------------------------------------------------------------------------------------------
+// Dashboard integration commands (Cyber Controller protocol). These commands are processed BEFORE
+// the gate password loop. They allow a host controller to query status and manage the device
+// remotely. Commands that modify state require authentication (the gate password).
+//
+// Protocol (all commands are case-insensitive, terminated by CR/LF):
+//   SM_STATUS                  -> return current state JSON
+//   SM_INFO                    -> return firmware/hardware info JSON
+//   SM_ARM                     -> arm the device (requires password confirmation)
+//   SM_DISARM <password>       -> disarm with password
+//   SM_SET_PASSWORD <old> <new> -> change password (NOT implemented in firmware — requires
+//                                  re-provisioning from host)
+//   SM_WIPE                    -> trigger immediate wipe (requires password confirmation)
+//
+// Responses are JSON lines prefixed with "SM>" for easy parsing by the controller.
+// ---------------------------------------------------------------------------------------------
+namespace dashboard {
+
+void sendStatus(const GateConfig& cfg) {
+  Serial.print(F("SM>{\"cmd\":\"STATUS\",\"provisioned\":"));
+  Serial.print(cfg.provisioned ? F("true") : F("false"));
+  Serial.print(F(",\"armed\":"));
+  Serial.print(cfg.armed);
+  Serial.print(F(",\"deadman\":"));
+  Serial.print(cfg.deadman);
+  Serial.print(F(",\"max_att\":"));
+  Serial.print(cfg.max_att);
+
+  // Read the runtime attempt counter.
+  GateRuntime rt = GateRuntime::load();
+  Serial.print(F(",\"att_ct\":"));
+  Serial.print(rt.att_ct);
+  Serial.print(F(",\"wipe_armed\":"));
+  Serial.print(rt.wipe_armed);
+  Serial.print(F(",\"resume_count\":"));
+  Serial.print(rt.resume_count);
+  Serial.println(F("}"));
+}
+
+void sendInfo(const GateConfig& cfg) {
+  Serial.print(F("SM>{\"cmd\":\"INFO\",\"fw_version\":\""));
+  Serial.print(SM_FW_VERSION);
+  Serial.print(F("\",\"arm_pin\":"));
+  Serial.print(cfg.arm_pin);
+  Serial.print(F(",\"arm_level\":"));
+  Serial.print(cfg.arm_level);
+  Serial.print(F(",\"arm_pull\":"));
+  Serial.print(cfg.arm_pull);
+  Serial.print(F(",\"brick\":"));
+  Serial.print(cfg.brick);
+  Serial.print(F(",\"fast_wipe\":"));
+  Serial.print(cfg.fast_wipe);
+  Serial.print(F(",\"wipe_sd\":"));
+  Serial.print(cfg.wipe_sd);
+  Serial.print(F(",\"wipe_ota\":"));
+  Serial.print(cfg.wipe_ota);
+  Serial.print(F(",\"wipe_nvs\":"));
+  Serial.print(cfg.wipe_nvs);
+  Serial.print(F(",\"wipe_spiffs\":"));
+  Serial.print(cfg.wipe_spiffs);
+  Serial.print(F(",\"sd_passes\":"));
+  Serial.print(cfg.sd_passes);
+  Serial.print(F(",\"kdf_iter\":"));
+  Serial.print(cfg.kdf_iter);
+
+  // SD card presence check.
+  bool sdPresent = false;
+#if !defined(SUICIDE_NO_SD)
+  sdPresent = SD.begin();
+  if (sdPresent) SD.end();
+#endif
+  Serial.print(F(",\"sd_present\":"));
+  Serial.print(sdPresent ? F("true") : F("false"));
+
+  // Brownout event count from NVS.
+  uint8_t boCount = 0;
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+  {
+    nvs_handle_t h;
+    if (nvs_open_from_partition("guardcfg", "sgate_rt", NVS_READONLY, &h) == ESP_OK) {
+      nvs_get_u8(h, "bo_count", &boCount);
+      nvs_close(h);
+    }
+  }
+#endif
+  Serial.print(F(",\"brownout_count\":"));
+  Serial.print(boCount);
+
+  // Board type detection.
+  Serial.print(F(",\"board\":\""));
+#if defined(CONFIG_IDF_TARGET_ESP32)
+  Serial.print(F("esp32"));
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+  Serial.print(F("esp32s3"));
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+  Serial.print(F("esp32c3"));
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+  Serial.print(F("esp32c6"));
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+  Serial.print(F("esp32s2"));
+#else
+  Serial.print(F("unknown"));
+#endif
+  Serial.println(F("\"}"));
+}
+
+// Process a dashboard command line. Returns true if the line was a recognized SM_ command
+// (handled here); false if it should be passed to the normal password extraction flow.
+bool processCommand(const char* trimmed, const GateConfig& cfg) {
+  if (startsWithCmd(trimmed, "sm_status", 9) &&
+      (trimmed[9] == '\0' || trimmed[9] == ' ')) {
+    sendStatus(cfg);
+    return true;
+  }
+  if (startsWithCmd(trimmed, "sm_info", 7) &&
+      (trimmed[7] == '\0' || trimmed[7] == ' ')) {
+    sendInfo(cfg);
+    return true;
+  }
+  if (startsWithCmd(trimmed, "sm_arm", 6) &&
+      (trimmed[6] == '\0' || trimmed[6] == ' ')) {
+    // ARM requires re-provisioning from the host (the armed flag is in the guardcfg NVS image).
+    // We cannot modify it at runtime without the host provisioner. Report this.
+    Serial.println(F("SM>{\"cmd\":\"ARM\",\"error\":\"arming requires re-provisioning from host "
+                     "(provision.py --armed 1). Cannot modify guardcfg NVS at runtime.\"}"));
+    return true;
+  }
+  if (startsWithCmd(trimmed, "sm_disarm", 9) &&
+      (trimmed[9] == '\0' || trimmed[9] == ' ')) {
+    // DISARM also requires re-provisioning. The armed flag is baked into the NVS image.
+    Serial.println(F("SM>{\"cmd\":\"DISARM\",\"error\":\"disarming requires re-provisioning from host "
+                     "(provision.py --armed 0). Cannot modify guardcfg NVS at runtime.\"}"));
+    return true;
+  }
+  if (startsWithCmd(trimmed, "sm_set_password", 15) &&
+      (trimmed[15] == '\0' || trimmed[15] == ' ')) {
+    // Password change requires re-provisioning (new salt + hash).
+    Serial.println(F("SM>{\"cmd\":\"SET_PASSWORD\",\"error\":\"password change requires re-provisioning "
+                     "from host (provision.py). Cannot modify guardcfg NVS at runtime.\"}"));
+    return true;
+  }
+  if (startsWithCmd(trimmed, "sm_wipe", 7) &&
+      (trimmed[7] == '\0' || trimmed[7] == ' ')) {
+    // SM_WIPE is mapped to the existing `wipe` command flow — password-authenticated.
+    Serial.println(F("SM>{\"cmd\":\"WIPE\",\"status\":\"redirecting to authenticated wipe flow\"}"));
+    // Fall through to the normal wipe handler by returning false and letting the caller
+    // see "wipe" as the command. We rewrite the intent so the standard wipe path handles it.
+    return false;  // caller will re-process as "wipe"
+  }
+  return false;  // not a dashboard command
+}
+
+}  // namespace dashboard
+
+InputResult Input::getPassword(const GateConfig& cfg) {
   InputResult r;  // got=false by default
   char line[kLineMax] = {0};
 
@@ -125,6 +297,20 @@ InputResult Input::getPassword(const GateConfig& /*cfg*/) {
   // Trim leading spaces (mirrors Marauder's input.trim() behavior for the keyword).
   const char* p = line;
   while (*p == ' ' || *p == '\t') ++p;
+
+  // Dashboard integration: check for SM_ commands first. These are handled without counting as
+  // password attempts and return got=false so BootGate re-prompts. SM_WIPE falls through to the
+  // normal wipe handler below.
+  if (startsWithCmd(p, "sm_", 3)) {
+    bool handled = dashboard::processCommand(p, cfg);
+    if (handled) {
+      secureZero(line, sizeof(line));
+      return r;  // got=false — re-prompt, not a password attempt
+    }
+    // SM_WIPE was not fully handled — it falls through to the standard wipe flow below.
+    // Rewrite p to point to "wipe" so the existing wipe handler picks it up.
+    p = "wipe";
+  }
 
   // `wipe` -> AUTHENTICATED host-assisted self-destruct (SPEC §6). We must NOT set wipeRequest
   // unconditionally: a bare `wipe\n` from terminal paste or serial noise must never destroy data.

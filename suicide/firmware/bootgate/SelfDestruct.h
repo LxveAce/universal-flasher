@@ -25,8 +25,10 @@ class SelfDestruct {
 
   // --- individual stages (each a no-op-but-log under SAFE_MODE) ---
 
-  // Stage 1: overwrite SD files + free space with esp_fill_random (cfg.sd_passes), then erase/format.
+  // Stage 1: full-LBA raw-sector wipe of the SD card when raw access is available (forensic-grade),
+  // falling back to file-level overwrite + free-space fill when raw access fails.
   // Best-effort: FTL wear-leveling/over-provisioning may retain remapped cells (documented).
+  // When cfg.sd_passes >= 2, a secure-erase mode writes random data on pass 1 then zeros on pass 2.
   static bool wipeSD(const GateConfig& cfg);
 
   // Stage 2: esp_partition_erase_range over ota_0/spiffs/nvs/coredump, then guardcfg LAST.

@@ -156,6 +156,8 @@ GateConfig GateConfig::load() {
   getU8(h, "wipe_sd", &cfg.wipe_sd);
   getU8(h, "brick", &cfg.brick);
   getU8(h, "sd_passes", &cfg.sd_passes);
+  getU8(h, "flash_passes", &cfg.flash_passes);  // absent (older guardcfg) => struct default (1)
+  getU8(h, "fast_wipe", &cfg.fast_wipe);
 
   nvs_close(h);
 

@@ -185,4 +185,194 @@ small series resistor (~1 kΩ) for ESD/noise on the safe GPIO, but **avoid large
 strapping-adjacent line (C3 `GPIO9` caps can force download mode). Surface arming state with an LED
 where the board allows it, so the owner always knows whether the device is hot (RESEARCH-DIGEST
 REQ-11).
-</content>
+
+---
+
+## 7. Detailed wiring guide: ESP32 Gold boards (GPIO27)
+
+The classic ESP32 "gold" boards (Lonely Binary Gold, bare WROOM/WROVER dev boards) are the most
+common Marauder platform. GPIO27 is the default arming pin -- it is a full bidirectional GPIO, not
+a strapping pin, and not used by any standard Marauder peripheral.
+
+### 7.1 Parts needed
+
+- 1x SPDT toggle switch (any panel-mount or PCB-mount SPDT)
+- 1x 10k ohm resistor (1/4W, through-hole or SMD)
+- Hookup wire (22-26 AWG)
+- Solder + soldering iron (or Dupont jumper wires for breadboard testing)
+
+### 7.2 Wiring diagram (text)
+
+```
+                          3.3V (from ESP32 3V3 pin)
+                           |
+                           o------- "ARMED" throw (switch position 1)
+                            \
+                             \  SPDT toggle switch
+                              \
+    ESP32 GPIO27 <-------------o  (switch COMMON terminal)
+         |
+         +---[10k resistor]---+
+         |                    |
+        GPIO                 GND (from ESP32 GND pin)
+
+    "NOT ARMED" throw (switch position 2) ---- GND  (optional explicit disarm)
+```
+
+**Connection summary:**
+
+| Wire | From | To |
+|------|------|----|
+| 1 | Switch COMMON | ESP32 GPIO27 |
+| 2 | Switch "ARMED" throw | ESP32 3V3 pin |
+| 3 | Switch "NOT ARMED" throw | ESP32 GND (optional) |
+| 4 | 10k resistor leg 1 | ESP32 GPIO27 (same node as wire 1) |
+| 5 | 10k resistor leg 2 | ESP32 GND |
+
+### 7.3 How it works
+
+- **Switch in ARMED position:** the common terminal connects to the 3.3V throw, driving GPIO27
+  HIGH. The 10k pull-down is overpowered by the direct 3.3V connection (negligible current through
+  the resistor). GPIO27 reads HIGH = `arm_level` = ARMED.
+- **Switch in NOT ARMED position:** the common terminal connects to GND (or floats if the second
+  throw is not wired). The 10k pull-down ensures GPIO27 is pulled cleanly to GND. GPIO27 reads
+  LOW = NOT ARMED.
+- **Wire cut / switch removed / floating:** the 10k pull-down pulls GPIO27 to GND. GPIO27 reads
+  LOW = NOT ARMED. This is the fail-safe direction -- a tampered wire cannot cause a false ARMED
+  reading.
+
+### 7.4 Test procedure
+
+1. Flash the Suicide Marauder firmware in `SUICIDE_SAFE_MODE`.
+2. Provision with `armed=1` and `deadman=1`:
+   ```sh
+   python host/provision.py --partitions firmware/partitions/suicide_4MB.csv \
+     --armed 1 --deadman 1 --arm-pin 27 --arm-level 1 --arm-pull 2
+   ```
+3. With the switch in the ARMED position, boot the board. Open a serial console at 115200 baud.
+   - Expected: the gate prompts for a password (the arming line reads HIGH = ARMED, so the
+     dead-man check passes and the password loop begins).
+4. Enter the correct password. The gate should print `password correct -> GATE_PASS` and Marauder
+   should boot normally.
+5. Flip the switch to NOT ARMED. Reboot the board.
+   - Expected: the gate detects the arming line NOT in armed position and triggers
+     `REASON_DEADMAN`. In SAFE_MODE this logs the simulated self-destruct without erasing anything.
+6. Remove the wire from GPIO27 entirely (simulate a cut wire). Reboot.
+   - Expected: same as step 5 -- the pull-down holds GPIO27 LOW, which reads NOT ARMED, which
+     triggers REASON_DEADMAN in SAFE_MODE.
+7. Verify the 10k pull-down: disconnect ONLY the pull-down resistor and leave GPIO27 floating
+   with the switch in the NOT ARMED position (common to GND throw). GPIO27 should still read LOW
+   (the GND throw provides the path). If the second throw is NOT wired to GND, a floating GPIO27
+   without the pull-down is indeterminate -- this is why the pull-down resistor is mandatory.
+
+### 7.5 Notes for input-only pins (GPIO34-39)
+
+If you use GPIO34, 35, 36 (VP), or 39 (VN) instead of GPIO27, the internal pull-down is NOT
+available (these pins are input-only with no internal pull resistors). The `arm_pull` config is
+silently ignored for these pins. You MUST use an external 10k pull-down resistor. The firmware
+detects this via `ArmingSwitch::pinIsInputOnly()` and warns during provisioning.
+
+---
+
+## 8. Detailed wiring guide: ESP32-C5 boards (Grove G2)
+
+The Waveshare ESP32-C5 is a newer chip that Marauder is being ported to. The C5 uses RISC-V
+cores and has a different GPIO layout than the classic ESP32.
+
+### 8.1 Grove G2 connector pin mapping
+
+On the Waveshare ESP32-C5 dev board, the Grove HY2.0-4P connector labeled "G2" exposes:
+
+| Grove pin | Function | ESP32-C5 GPIO |
+|-----------|----------|---------------|
+| Pin 1 (yellow) | Signal 1 (G1) | GPIO6 (verify per board revision) |
+| Pin 2 (white) | Signal 2 (G2) | GPIO7 (verify per board revision) |
+| Pin 3 (red) | VCC | 3.3V |
+| Pin 4 (black) | GND | GND |
+
+**IMPORTANT:** The ESP32-C5 is a very new chip. The exact GPIO numbers for the Grove connector
+may vary between board revisions. **Always verify against your specific board's schematic or
+silkscreen** before committing a pin. The bootloader offset on C5 is `0x2000` (not `0x0` or
+`0x1000`).
+
+### 8.2 Strapping pins to avoid on ESP32-C5
+
+The ESP32-C5 strapping pins are not yet fully documented in the public Espressif datasheets as of
+this writing. Provisionally, avoid the boot/download pins (typically GPIO8, GPIO9 on RISC-V
+Espressif chips). The Grove G2 pins (GPIO6/7) are expected to be safe non-strapping GPIOs, but
+**verify against the C5 technical reference manual** when available.
+
+### 8.3 Wiring an SPDT switch to a Grove connector
+
+The Grove connector provides 3.3V and GND on pins 3 and 4, which is convenient -- the switch
+wiring can be entirely within the Grove cable:
+
+```
+    Grove connector (HY2.0-4P)
+    +---------+
+    | Pin 1 (G1)  -- unused (or I2C SDA if needed)
+    | Pin 2 (G2)  -- arming input (GPIO7)  <--+
+    | Pin 3 (VCC) -- 3.3V                     |
+    | Pin 4 (GND) -- GND                      |
+    +---------+                                |
+                                               |
+         3.3V (from Grove pin 3)               |
+          |                                    |
+          o------- "ARMED" throw               |
+           \                                   |
+            \  SPDT switch                     |
+             \                                 |
+              o  (COMMON) ---------------------+
+                                               |
+              +---[10k resistor]---+            |
+              |                    |            |
+             (same node)         GND (from Grove pin 4)
+```
+
+**Provision command for C5:**
+```sh
+python host/provision.py --partitions firmware/partitions/suicide_4MB.csv \
+  --chip esp32c5 --armed 1 --deadman 1 --arm-pin 7 --arm-level 1 --arm-pull 2
+```
+
+### 8.4 Grove cable modification
+
+To wire a switch inline with a Grove cable:
+
+1. Cut a standard Grove HY2.0-4P cable in the middle.
+2. Solder the white wire (pin 2 / G2) to the switch COMMON terminal.
+3. Solder a short wire from the switch ARMED throw to the red wire (pin 3 / VCC / 3.3V).
+4. Solder a 10k resistor from the white wire (at the switch common) to the black wire (pin 4 / GND).
+5. (Optional) Connect the NOT ARMED throw to the black wire (GND) for explicit disarm.
+6. Re-insulate all connections with heat-shrink tubing.
+7. Plug the modified cable into the Grove G2 connector on the C5 board.
+
+### 8.5 Test procedure (same as section 7.4)
+
+Follow the same test procedure as for the ESP32 Gold boards (section 7.4), substituting:
+- `--arm-pin 7` (or whichever GPIO the G2 connector maps to on your board revision)
+- `--chip esp32c5`
+
+---
+
+## 9. Brownout/low-voltage protection and arming
+
+The gate includes built-in brownout/low-voltage protection that interacts with the arming switch:
+
+- **Hardware brownout reset detection:** if the ESP32's hardware brownout detector fires (supply
+  drops below ~2.3V on classic ESP32), the next boot is flagged as low-supply. The dead-man
+  pre-check is SKIPPED (the arming line read is untrustworthy at low voltage), and destruction
+  is SUPPRESSED. The correct password is still required to boot -- no bypass.
+- **ADC-based voltage monitoring (optional):** define `SUPPLY_ADC_PIN` and
+  `SUPPLY_ADC_THRESHOLD_MV` at build time to enable runtime voltage checking via an ADC pin with
+  a voltage divider from VIN/VBAT. When the reading falls below the threshold, the gate treats
+  it as a low-supply condition.
+- **Brownout event logging:** every brownout event is logged to NVS (`sgate_rt.bo_count`). The
+  operator can read this count via the `SM_INFO` serial command or by reading NVS directly.
+- **Fast wipe mode:** provision with `--fast-wipe 1` to skip SD wipe on trigger and go straight
+  to flash erase + boot brick. This is designed for brownout-prone setups where the SD wipe (which
+  can take minutes for large cards) is likely to be interrupted by power loss.
+
+For battery-powered builds (StickC, Cardputer), the ADC voltage monitoring is particularly
+important. Wire a voltage divider from VBAT to an ADC-capable pin and configure the threshold
+appropriately for your battery chemistry.
