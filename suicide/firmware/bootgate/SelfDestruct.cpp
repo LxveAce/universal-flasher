@@ -43,6 +43,12 @@
 #include "esp_flash.h"          // esp_flash_erase_region, esp_flash_default_chip
 #include "bootloader_random.h"  // bootloader_random_enable/disable (true-random for the overwrite)
 #include "soc/soc_caps.h"
+#include "esp_cpu.h"            // esp_cpu_stall — freeze the other core during the self-brick
+#include "esp_intr_alloc.h"     // esp_intr_noniram_disable — mask flash-resident IRQs during the brick
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#include "esp32/rom/spi_flash.h"  // esp_rom_spiflash_unlock/erase_sector/write — ROM brick bypass
+#include "esp32/rom/cache.h"      // Cache_Read_Disable — disable the flash cache for the ROM erase
+#endif
 #endif
 
 // ----- SD card stack (Arduino). On Marauder the SD is on SPI; standalone boards may use SD_MMC.
@@ -507,9 +513,18 @@ __attribute__((weak)) bool wipeSDImpl(const GateConfig& cfg) {
     return false;
   }
 
-  // PRIMARY: attempt full-LBA raw-sector wipe (forensic-grade). This writes zeros (or
-  // random+zeros for passes >= 2) to every sector on the card, bypassing the filesystem.
-  bool rawOk = rawSectorWipe(buf, OVERWRITE_BUF, passes);
+  // PRIMARY: full-LBA raw-sector wipe (forensic-grade) — OPT-IN via SUICIDE_SD_SDMMC. Only boards that
+  // wire the SD card to the ESP32 SDMMC peripheral (4-bit/1-bit) can use it; on the SPI-SD boards that
+  // most Marauder hardware (incl. the CYD) uses, sdmmc_card_init() abort()s during init when there is
+  // no card / the SDMMC pins aren't wired — which would crash the whole wipe. So it is off by default
+  // and the portable, abort-safe file-level path below (SD.begin(), which simply returns false with no
+  // card) is the default. Set -DSUICIDE_SD_SDMMC on a genuinely SDMMC-wired board for the raw wipe.
+  bool rawOk = false;
+#if defined(SUICIDE_SD_SDMMC)
+  rawOk = rawSectorWipe(buf, OVERWRITE_BUF, passes);
+#else
+  (void)rawSectorWipe;  // referenced only under SUICIDE_SD_SDMMC; keep it from being a dead-code warning
+#endif
   if (rawOk) {
     ESP_LOGW(TAG, "SD wipe: full-LBA raw-sector wipe succeeded (forensic-grade)");
     memset(buf, 0, OVERWRITE_BUF);
@@ -715,6 +730,33 @@ static constexpr uint32_t PARTITION_TABLE_OFFSET = 0x8000;  // SPEC §2: always 
 static constexpr uint32_t PARTITION_TABLE_SIZE   = 0x1000;  // one sector covers the table
 static constexpr uint32_t BOOTLOADER_SPAN        = 0x7000;  // bootloader region up to the table
 
+#if defined(CONFIG_IDF_TARGET_ESP32)
+// The IDF's internal "enter a flash-only critical section" primitive: disables interrupts, stalls the
+// other CPU, and DISABLES THE FLASH CACHE the correct way (waits for the cache to go idle before
+// clearing the enable bit — Cache_Read_Disable() alone wedges the SPI0/SPI1 arbitration). It has no
+// public header but the symbol is exported by libspi_flash.a, so we declare it and let the linker bind
+// it. After this returns, only ROM (esp_rom_spiflash_*) + IRAM code may run, and the ROM SPI erase is
+// safe. We never call the matching _enable_ (we reset into a dead boot chain).
+extern "C" void spi_flash_disable_interrupts_caches_and_other_cpu(void);
+#endif
+
+// Erase the write-PROTECTED boot chain (2nd-stage bootloader + partition table). The partition table
+// is anti-forensically important: it literally names the `guardcfg` partition, a tell that the board
+// ran the gate. On a CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED build the normal esp_flash erase works;
+// on the stock arduino-esp32 core (DANGEROUS_WRITE_ABORTS) esp_flash_erase_region on 0x0000-0x9000
+// would abort(), so a future iteration uses the ROM SPI erase to bypass the IDF check. The running
+// app is already obliterated by the caller, so when this is a no-op the firmware is STILL gone and
+// the board will not boot — only the generic stub + the 'guardcfg'-naming table survive.
+static void IRAM_ATTR brickProtectedChain(esp_flash_t* chip) {
+  (void)chip;
+#if defined(CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED)
+  esp_flash_erase_region(chip, PARTITION_TABLE_OFFSET, PARTITION_TABLE_SIZE);
+  esp_flash_erase_region(chip, BOOTLOADER_OFFSET,
+                         BOOTLOADER_OFFSET == 0x0 ? PARTITION_TABLE_OFFSET : BOOTLOADER_SPAN);
+#endif
+  // else: stock arduino-esp32 core — bypass added + hardware-validated in a later iteration.
+}
+
 #endif  // ESP32
 
 void IRAM_ATTR SelfDestruct::brickBootChain(const GateConfig& cfg) {
@@ -736,31 +778,83 @@ void IRAM_ATTR SelfDestruct::brickBootChain(const GateConfig& cfg) {
     delay(1000);
   }
 #elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-  (void)cfg;
-
-  // Resolve the running app region BEFORE we destroy the partition table (after which the
-  // partition APIs are invalid). Capture as plain integers held in registers/DRAM.
+  // Resolve the running app region BEFORE the destructive sequence (the esp_partition / esp_ota APIs
+  // read the cache/flash). Capture as plain integers held in registers/DRAM.
   const esp_partition_t* running = esp_ota_get_running_partition();
   uint32_t app_addr = running ? (uint32_t)running->address : 0x10000u;  // SPEC §2 default app
-  uint32_t app_size = running ? (uint32_t)running->size : 0x100000u;
+  uint32_t app_size = running ? (uint32_t)running->size : 0x1E0000u;
 
-  esp_flash_t* chip = esp_flash_default_chip;
+  // Forensic overwrite payload, captured NOW while the flash cache is up (esp_fill_random lives in
+  // flash). After the cache is disabled below, ONLY ROM (esp_rom_spiflash_*) + IRAM code may run.
+  static uint8_t g_brick_buf[4096];  // DRAM (static); 4-byte aligned for esp_rom_spiflash_write
+  const uint8_t passes = (cfg.fast_wipe || g_resume_fast) ? 0 : cfg.flash_passes;
+  if (passes) {
+    esp_fill_random(g_brick_buf, sizeof(g_brick_buf));
+  }
 
-  // From here on: NO logging, NO flash-resident access. Cache is disabled inside each erase call.
-  // Order within the brick: (a) partition table -> ROM can no longer find any image; (b)
-  // bootloader -> nothing to execute; (c) the running app region LAST so the CPU keeps fetching
-  // valid instructions for as long as possible.
-  esp_flash_erase_region(chip, PARTITION_TABLE_OFFSET, PARTITION_TABLE_SIZE);
-  esp_flash_erase_region(chip, BOOTLOADER_OFFSET,
-                         BOOTLOADER_OFFSET == 0x0 ? PARTITION_TABLE_OFFSET : BOOTLOADER_SPAN);
-  // The UNVERIFIED self-erase of the running region. If the CPU faults mid-erase the device is
-  // already non-bootable (table + bootloader are gone), so the end state is still a brick.
-  esp_flash_erase_region(chip, app_addr, app_size);
+#if defined(CONFIG_IDF_TARGET_ESP32)
+  // ---- Self-brick via the ROM SPI flash driver ----
+  // esp_flash_erase_region() abort()s on the stock arduino-esp32 core (CONFIG_SPI_FLASH_DANGEROUS_
+  // WRITE_ABORTS): it refuses to touch the protected boot chain AND its OS layer asserts when asked to
+  // erase the region the CPU is executing from (observed: esp_flash_api.c abort, even for the app
+  // slot). We bypass it: enter the IDF flash-only critical section (IRQs off, other core stalled, flash
+  // cache disabled the correct idle-then-clear way — a manual Cache_Read_Disable wedges SPI0/SPI1), then
+  // erase/overwrite with the ROM SPI routines (mask ROM, no such checks). After the critical section
+  // NOTHING flash-resident may execute — brickBootChain is IRAM_ATTR and only ROM + register writes run.
+  esp_rom_spiflash_unlock();                          // clear flash block-protect bits
+  // Disable the RTC watchdog AND the Timer-Group MWDTs (TG0/TG1) so the multi-second full-app ROM erase
+  // is never reset mid-wipe (each: write the WP key, clear WDTCONFIG0, re-lock). RTC_CNTL @0x3FF48000
+  // (WDTCONFIG0 +0x8C, WP +0xA4); TIMG0 @0x3FF5F000, TIMG1 @0x3FF60000 (WDTCONFIG0 +0x48, WP +0x64);
+  // WDT write key 0x50D83AA1.
+  (*(volatile uint32_t*)0x3FF480A4) = 0x50D83AA1u; (*(volatile uint32_t*)0x3FF4808C) = 0u; (*(volatile uint32_t*)0x3FF480A4) = 0u;
+  (*(volatile uint32_t*)0x3FF5F064) = 0x50D83AA1u; (*(volatile uint32_t*)0x3FF5F048) = 0u; (*(volatile uint32_t*)0x3FF5F064) = 0u;
+  (*(volatile uint32_t*)0x3FF60064) = 0x50D83AA1u; (*(volatile uint32_t*)0x3FF60048) = 0u; (*(volatile uint32_t*)0x3FF60064) = 0u;
+  // Enter the IDF flash-only critical section: interrupts off, other CPU stalled, flash cache disabled
+  // the correct (idle-then-clear) way. After this, only ROM + IRAM may run; the SPI1 ROM erase is safe.
+  spi_flash_disable_interrupts_caches_and_other_cpu();
 
-  // Should never reach here on real hardware. Force a reset into a now-empty boot chain.
-  esp_restart();
+  // (1) Obliterate the running app (Marauder): forensic random-overwrite passes + a final clean erase.
+  for (uint8_t p = 0; p < passes; ++p) {
+    for (uint32_t a = app_addr; a < app_addr + app_size; a += 0x1000u) {
+      esp_rom_spiflash_erase_sector(a >> 12);
+    }
+    for (uint32_t off = 0; off < app_size; off += (uint32_t)sizeof(g_brick_buf)) {
+      esp_rom_spiflash_write(app_addr + off, (const uint32_t*)g_brick_buf, (int32_t)sizeof(g_brick_buf));
+    }
+  }
+  for (uint32_t a = app_addr; a < app_addr + app_size; a += 0x1000u) {
+    esp_rom_spiflash_erase_sector(a >> 12);  // final clean erase — load-bearing
+  }
+
+  // (2) Partition table + 2nd-stage bootloader (anti-forensic: the table literally names 'guardcfg').
+  esp_rom_spiflash_erase_sector(PARTITION_TABLE_OFFSET >> 12);
+  for (uint32_t a = BOOTLOADER_OFFSET; a < PARTITION_TABLE_OFFSET; a += 0x1000u) {
+    esp_rom_spiflash_erase_sector(a >> 12);
+  }
+
+  // (3) Software-reset into the now-empty boot chain (RTC_CNTL SW_SYS_RST — register write, IRAM-safe;
+  //     esp_restart() can't be called — its code lives in the erased app flash).
+  (*(volatile uint32_t*)0x3FF48000) = (1u << 31);     // RTC_CNTL_OPTIONS0_REG: SW_SYS_RST
   for (;;) {
   }
+#else
+  // Non-ESP32 targets (S3/C3/C6/...): the ROM self-brick is added + hardware-validated per chip. Until
+  // then, fall back to the esp_flash path (obliterates the app on DANGEROUS_WRITE_ALLOWED builds;
+  // app-first so it is gone even if the protected erase aborts) + brickProtectedChain().
+  esp_flash_t* chip = esp_flash_default_chip;
+  for (uint8_t p = 0; p < passes; ++p) {
+    esp_flash_erase_region(chip, app_addr, app_size);
+    for (uint32_t off = 0; off < app_size; off += sizeof(g_brick_buf)) {
+      uint32_t chunk =
+          (app_size - off) < sizeof(g_brick_buf) ? (app_size - off) : (uint32_t)sizeof(g_brick_buf);
+      esp_flash_write(chip, g_brick_buf, app_addr + off, chunk);
+    }
+  }
+  esp_flash_erase_region(chip, app_addr, app_size);
+  brickProtectedChain(chip);
+  for (;;) {
+  }
+#endif
 #else
   (void)cfg;
   for (;;) {

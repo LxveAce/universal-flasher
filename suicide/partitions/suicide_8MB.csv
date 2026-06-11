@@ -1,9 +1,9 @@
-# suicide_8MB.csv — FORK variant, 8 MB flash (0x800000)
+# suicide_8MB.csv - FORK variant, 8 MB flash (0x800000)
 #
-# docs/SPEC.md §3.2. Roomy: keeps BOTH Marauder app slots (ota_0 + ota_1) so Marauder's own
+# docs/SPEC.md sec 3.2. Roomy: keeps BOTH Marauder app slots (ota_0 + ota_1) so Marauder's own
 # SD-OTA self-update keeps working (unlike the 4 MB build), plus a larger 16 KB `guardcfg`, a
 # full-size SPIFFS, and a full 64 KB coredump. Bootloader @0x1000 (classic ESP32) or @0x0 on
-# S3/C3 — set by the build; the partition TABLE offset (0x8000) is unchanged. App offsets are
+# S3/C3 - set by the build; the partition TABLE offset (0x8000) is unchanged. App offsets are
 # 64 KB (0x10000) aligned; data partitions are 4 KB (0x1000) aligned. Sums to exactly 0x800000.
 #
 # Layout math (see README.md):
@@ -18,7 +18,7 @@
 #
 # `scratch` (data 0x40) is REQUIRED for SUICIDE_SAFE_MODE: the firmware refuses to simulate a wipe
 # (zero erases) if no `scratch` partition exists and NEVER falls back to a live partition
-# (docs/SPEC.md §3/§5/§8). Reclaimed by shrinking spiffs 0x10000; still fills 8 MB exactly.
+# (docs/SPEC.md sec 3/sec 5/sec 8). Reclaimed by shrinking spiffs 0x10000; still fills 8 MB exactly.
 #
 # Name,    Type, SubType, Offset,   Size,     Flags
 nvs,       data, nvs,     0x9000,   0x5000,

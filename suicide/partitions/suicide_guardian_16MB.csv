@@ -1,9 +1,9 @@
-# suicide_guardian_16MB.csv — GUARDIAN variant, 16 MB flash (0x1000000)
+# suicide_guardian_16MB.csv - GUARDIAN variant, 16 MB flash (0x1000000)
 #
-# docs/SPEC.md §3.3 / §1 (GUARDIAN). A tiny `factory` Guardian app gates first on cold boot
+# docs/SPEC.md sec 3.3 / sec 1 (GUARDIAN). A tiny `factory` Guardian app gates first on cold boot
 # (blank otadata => bootloader runs factory), then esp_ota_set_boot_partition(ota_0) + esp_restart()
 # hands off to an UNMODIFIED Marauder in `ota_0`. To re-assert the gate, the Guardian either erases
-# `otadata` or calls set_boot_partition(factory) (which itself just formats otadata — verified in
+# `otadata` or calls set_boot_partition(factory) (which itself just formats otadata - verified in
 # esp_ota_ops.c). Enable CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE so a Marauder that never marks
 # itself valid auto-reverts to the Guardian factory app.
 #
@@ -16,9 +16,9 @@
 #   otadata   bootloader's OTA-select sectors (blank => boot factory/Guardian)
 #   factory   the Guardian gate app (1 MB; the gate is small, this is generous headroom)
 #   ota_0     unmodified Marauder app (2 MB; >= its ~1.875 MB min_spiffs slot)
-#   guardcfg  gate config (subtype nvs, namespaces sgate/sgate_rt) — NEVER renamed; host keys off it
+#   guardcfg  gate config (subtype nvs, namespaces sgate/sgate_rt) - NEVER renamed; host keys off it
 #   spiffs    Marauder filesystem assets
-#   scratch   SAFE_MODE dry-run erase target (subtype 0x40) — REQUIRED for SUICIDE_SAFE_MODE builds
+#   scratch   SAFE_MODE dry-run erase target (subtype 0x40) - REQUIRED for SUICIDE_SAFE_MODE builds
 #   coredump  crash dumps
 #
 # Layout math (see README.md):
@@ -33,7 +33,7 @@
 #
 # `scratch` (data 0x40) is REQUIRED for SUICIDE_SAFE_MODE: the firmware refuses to simulate a wipe
 # (zero erases) if no `scratch` partition exists and NEVER falls back to a live partition
-# (docs/SPEC.md §3/§5/§8). Reclaimed by shrinking spiffs 0x10000; still fills 16 MB exactly.
+# (docs/SPEC.md sec 3/sec 5/sec 8). Reclaimed by shrinking spiffs 0x10000; still fills 16 MB exactly.
 #
 # Name,    Type, SubType, Offset,   Size,     Flags
 nvs,       data, nvs,     0x9000,   0x5000,

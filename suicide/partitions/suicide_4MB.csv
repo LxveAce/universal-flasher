@@ -1,14 +1,14 @@
-# suicide_4MB.csv — FORK variant, classic ESP32 / CYD, 4 MB flash (0x400000)
+# suicide_4MB.csv - FORK variant, classic ESP32 / CYD, 4 MB flash (0x400000)
 #
-# CANONICAL: this file is the committed reference table in docs/SPEC.md §3.1 and MUST match it
+# CANONICAL: this file is the committed reference table in docs/SPEC.md sec 3.1 and MUST match it
 # byte-for-byte. Derived from arduino-esp32 min_spiffs.csv, carving a 12 KB `guardcfg` (subtype
 # nvs) out of the tail and DROPPING the second app slot (ota_1). On 4 MB there is no room for two
 # ~1.875 MB app slots plus guardcfg + spiffs + coredump, so Marauder's SD-OTA self-update is
-# disabled on this build (documented trade-off — see README.md). Bootloader @0x1000 (classic
+# disabled on this build (documented trade-off - see README.md). Bootloader @0x1000 (classic
 # ESP32), partition table @0x8000. App offsets are 64 KB (0x10000) aligned.
 #
 # `scratch` (data, subtype 0x40, 64 KB @0x200000) is the dedicated SAFE_MODE dry-run target
-# (docs/SPEC.md §3.1/§5/§8). It sits in the previously-unallocated upper window and is REQUIRED
+# (docs/SPEC.md sec 3.1/sec 5/sec 8). It sits in the previously-unallocated upper window and is REQUIRED
 # whenever SUICIDE_SAFE_MODE is built: the firmware refuses to simulate a wipe (zero erases) if no
 # `scratch` partition is present, and NEVER falls back to a live partition. With scratch added the
 # 0x200000-0x210000 window is now allocated; everything above 0x210000 stays reserved/unused.

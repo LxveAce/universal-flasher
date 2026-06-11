@@ -98,14 +98,14 @@ void Input::notifyLocked(uint32_t seconds) {
 namespace {
 bool touchKeyboardInput(char* buffer, size_t bufLen, const char* title) {
 #if defined(SUICIDE_HAVE_TOUCH_KEYBOARD_OBJ)
-  // Marauder global instance (name confirmed at integration time).
-  extern TouchKeyboard touch_keyboard_obj;
-  return touch_keyboard_obj.keyboardInput(buffer, bufLen, title) == KB_DONE;
+  // Marauder exposes a FREE function `keyboardInput(char*, size_t, const char*)` (TouchKeyboard.h)
+  // that draws the on-screen masked keypad and returns true when the user finishes entry (KB_DONE),
+  // false on cancel/dismiss. VERIFIED against justcallmekoko/ESP32Marauder (TouchKeyboard.h:29 and
+  // the SSID/password call sites in esp32_marauder.ino / MenuFunctions.cpp). It is NOT a method on a
+  // global instance — an earlier revision of this shim wrongly assumed a `touch_keyboard_obj`.
+  return ::keyboardInput(buffer, bufLen, title);
 #else
-  // No verified free-function touch-keyboard entry point exists in upstream Marauder. Rather than
-  // call a likely-nonexistent free ::keyboardInput() (which would silently link-fail or, worse,
-  // bind to the wrong symbol), require the integration step to wire the real Marauder instance.
-  #error "GATE_INPUT_TOUCH requires SUICIDE_HAVE_TOUCH_KEYBOARD_OBJ + Marauder touch_keyboard_obj wiring (see INTEGRATION.md)"
+  #error "GATE_INPUT_TOUCH requires SUICIDE_HAVE_TOUCH_KEYBOARD_OBJ + Marauder's keyboardInput() (TouchKeyboard.h); see INTEGRATION.md"
 #endif
 }
 }  // namespace
