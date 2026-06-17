@@ -1,0 +1,233 @@
+; platformio.ini.example — Suicide Marauder FORK build environments
+;
+; Owner-only, DEFENSIVE anti-forensic ("duress") layer for a Marauder you own. Not for evading
+; lawful process. Read docs/SAFETY.md and docs/THREAT-MODEL.md. Canonical contract: docs/SPEC.md.
+;
+; HOW TO USE
+;   1. Patch the upstream ESP32Marauder .ino (firmware/integration/esp32marauder.ino.patch).
+;   2. Copy this file to `platformio.ini` in the patched Marauder tree (or merge these envs into an
+;      existing one). Adjust `board`, the User_Setup, and paths to match your checkout.
+;   3. ALWAYS build/test a *_safe env FIRST. Only move to *_t1 on a SACRIFICIAL board. *_t2 enables
+;      IRREVERSIBLE eFuse Secure Boot / Flash Encryption — read INTEGRATION.md §6 before using it.
+;
+; Naming: <board>_<input>_<tier>   e.g. esp32dev_serial_safe, cyd_touch_t1.
+;   tier  safe = SUICIDE_SAFE_MODE (simulate + log only, nothing destroyed)   <-- build this first
+;         t1   = real wipe, reflashable (brick=0)                              <-- sacrificial board
+;         t2   = real wipe + brick + expects Secure Boot v2 + Flash Encryption <-- IRREVERSIBLE eFuse
+;
+; Per-board details (input class, default arm_pin, flash size, partition CSV) are in
+; firmware/integration/INTEGRATION.md §4–§5. CSV files live in firmware/partitions/.
+;
+; Exactly ONE GATE_INPUT_* per build (SPEC §5). Exactly ONE of SUICIDE_FORK/SUICIDE_GUARDIAN
+; (these envs are all FORK). The arming-pin -D flags are compile-time FALLBACKS only — the real
+; values live in the flashed `guardcfg` NVS (SPEC §4). The plaintext password is NEVER a build flag.
+
+; ----------------------------------------------------------------------------------------------
+[platformio]
+; Point this at the upstream esp32_marauder sketch folder if this ini is not already beside it.
+; src_dir = esp32_marauder
+default_envs = esp32dev_serial_safe
+
+; ==============================================================================================
+; Shared base: pulls firmware/bootgate into the build WITHOUT copying it into the sketch tree.
+; build_src_filter keeps all of Marauder's own sources (+<*>) and adds ../bootgate/*.cpp.
+; The -I puts ../bootgate on the include path so the patched #include "bootgate/BootGate.h" resolves
+; (the bootgate/ prefix is satisfied by -I${PROJECT_DIR}/.. ; both include forms are provided).
+; ==============================================================================================
+[gate_base]
+platform = espressif32
+framework = arduino
+monitor_speed = 115200
+upload_speed = 921600
+build_src_filter = +<*> +<../bootgate/>
+build_flags =
+    -DSUICIDE_FORK
+    -I${PROJECT_DIR}/../bootgate
+    -I${PROJECT_DIR}/..
+
+; Tier fragments — compose with ${gate_base.build_flags} in each env.
+[gate_safe]
+build_flags = -DSUICIDE_SAFE_MODE
+[gate_t1]
+build_flags =
+[gate_t2]
+; T2 ALSO requires Secure Boot v2 + Flash Encryption (release mode) configured in the IDF/sdkconfig
+; sidecar and the IRREVERSIBLE espefuse steps — see INTEGRATION.md §6.3. The brick self-erase is the
+; UNVERIFIED primitive (SPEC §8/§13), implemented behind SUICIDE_SAFE_MODE; spike on a sacrificial
+; board (docs/SPIKE-PLAN.md) before ever building a non-SAFE T2.
+build_flags =
+    -DSUICIDE_TIER_T2
+    -DCONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=1
+
+; ==============================================================================================
+; Classic ESP32 dev / Lonely Binary Gold — 4 MB, serial input (default arm_pin GPIO27 pulldown).
+; ==============================================================================================
+[env:esp32dev_serial_safe]
+extends = gate_base
+board = esp32dev
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_safe.build_flags}
+    -DGATE_INPUT_SERIAL
+    -DARMING_PIN=27 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+[env:esp32dev_serial_t1]
+extends = gate_base
+board = esp32dev
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_t1.build_flags}
+    -DGATE_INPUT_SERIAL
+    -DARMING_PIN=27 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+[env:esp32dev_serial_t2]
+extends = gate_base
+board = esp32dev
+; T2 prefers a 16 MB layout with headroom for an nvs_keys partition (NVS encryption, SPEC §4).
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_16MB.csv
+board_upload.flash_size = 16MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_t2.build_flags}
+    -DGATE_INPUT_SERIAL
+    -DARMING_PIN=27 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+; ==============================================================================================
+; CYD 2.8"/3.5" (Cheap Yellow Display) — 4 MB, resistive/capacitive touch (HAS_TOUCH).
+; Reuses Marauder's keyboardInput() on-screen keypad. arm_pin: GPIO27 or a broken-out CN1/P3 pin.
+;
+; GATE_INPUT_TOUCH REQUIRES -DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ too: GateInput_touch.cpp binds to
+; Marauder's real `touch_keyboard_obj` (TouchKeyboard.h) and #errors without this define so a build
+; can never silently link the wrong/absent keyboard symbol. It is correct HERE because the FORK builds
+; against the Marauder source (which provides touch_keyboard_obj). If your Marauder revision names the
+; instance differently, override the shim per INTEGRATION.md instead of dropping the define.
+; ==============================================================================================
+[env:cyd_touch_safe]
+extends = gate_base
+board = esp32dev
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_safe.build_flags}
+    -DGATE_INPUT_TOUCH -DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ
+    -DARMING_PIN=27 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+[env:cyd_touch_t1]
+extends = gate_base
+board = esp32dev
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_t1.build_flags}
+    -DGATE_INPUT_TOUCH -DSUICIDE_HAVE_TOUCH_KEYBOARD_OBJ
+    -DARMING_PIN=27 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+; ==============================================================================================
+; Marauder Mini (joystick) — 8 MB; reuses MenuFunctions::miniKeyboard(..., do_pass=true).
+; S3-class default arm_pin = Grove G2 (GPIO2 on the Grove header — verify it is NOT a strap on your
+; module; SPEC §7 forbids S3 0/3/45/46). Adjust `board` to your exact S3 variant.
+; ==============================================================================================
+[env:mini_minikb_safe]
+extends = gate_base
+board = esp32-s3-devkitc-1
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_8MB.csv
+board_upload.flash_size = 8MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_safe.build_flags}
+    -DGATE_INPUT_MINI_KB
+    -DARMING_PIN=2 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+[env:mini_minikb_t1]
+extends = gate_base
+board = esp32-s3-devkitc-1
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_8MB.csv
+board_upload.flash_size = 8MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_t1.build_flags}
+    -DGATE_INPUT_MINI_KB
+    -DARMING_PIN=2 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+; ==============================================================================================
+; M5Cardputer / Cardputer ADV (S3) — 8 MB; native QWERTY matrix. arm_pin = Grove G2.
+; ==============================================================================================
+[env:cardputer_kb_safe]
+extends = gate_base
+board = esp32-s3-devkitc-1
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_8MB.csv
+board_upload.flash_size = 8MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_safe.build_flags}
+    -DGATE_INPUT_CARDPUTER
+    -DARMING_PIN=2 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+[env:cardputer_kb_t1]
+extends = gate_base
+board = esp32-s3-devkitc-1
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_8MB.csv
+board_upload.flash_size = 8MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_t1.build_flags}
+    -DGATE_INPUT_CARDPUTER
+    -DARMING_PIN=2 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+; ==============================================================================================
+; M5StickC / Plus / Plus2 — 4 MB; button-combo input (WEAK; prefer host-assisted serial unlock).
+; arm_pin = Grove G2 (GPIO32/33 on StickC Grove — pick a free, non-strap pin on YOUR unit).
+; ==============================================================================================
+[env:stickc_buttons_safe]
+extends = gate_base
+board = m5stick-c
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_safe.build_flags}
+    -DGATE_INPUT_BUTTONS
+    -DARMING_PIN=33 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+[env:stickc_buttons_t1]
+extends = gate_base
+board = m5stick-c
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_t1.build_flags}
+    -DGATE_INPUT_BUTTONS
+    -DARMING_PIN=33 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+; ==============================================================================================
+; ESP32-C3 — 4 MB, headless serial. Bootloader offset is 0x0 on C3 (SPEC §2) — PlatformIO/IDF
+; handles this automatically. arm_pin = GPIO10 (avoid C3 strapping 2/8/9).
+; ==============================================================================================
+[env:c3_serial_safe]
+extends = gate_base
+board = esp32-c3-devkitm-1
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_safe.build_flags}
+    -DGATE_INPUT_SERIAL
+    -DARMING_PIN=10 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2
+
+[env:c3_serial_t1]
+extends = gate_base
+board = esp32-c3-devkitm-1
+board_build.partitions = ${PROJECT_DIR}/../partitions/suicide_4MB.csv
+board_upload.flash_size = 4MB
+build_flags =
+    ${gate_base.build_flags}
+    ${gate_t1.build_flags}
+    -DGATE_INPUT_SERIAL
+    -DARMING_PIN=10 -DARMING_ACTIVE_LEVEL=1 -DARMING_PULL=2

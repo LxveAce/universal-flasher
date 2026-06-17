@@ -1,0 +1,14 @@
+.pio/
+# bootgate sources are copied in by scripts/build_test_harness.* — do not commit the copies
+src/GateConfig.h
+src/GateConfig.cpp
+src/GateCrypto.h
+src/GateCrypto.cpp
+src/ArmingSwitch.h
+src/ArmingSwitch.cpp
+src/SelfDestruct.h
+src/SelfDestruct.cpp
+src/BootGate.h
+src/BootGate.cpp
+src/GateInput.h
+src/GateInput_serial.cpp

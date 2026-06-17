@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#0b0f0a"/>
+  <g fill="none" stroke="#39ff14" stroke-width="6" stroke-linecap="round">
+    <!-- radar arcs -->
+    <path d="M128 196 A 68 68 0 0 1 60 128" opacity="0.35"/>
+    <path d="M128 178 A 50 50 0 0 1 78 128" opacity="0.55"/>
+    <path d="M128 160 A 32 32 0 0 1 96 128" opacity="0.8"/>
+    <!-- sweep line -->
+    <line x1="128" y1="128" x2="196" y2="74"/>
+  </g>
+  <!-- center node -->
+  <circle cx="128" cy="128" r="9" fill="#39ff14"/>
+  <!-- antenna -->
+  <line x1="128" y1="128" x2="128" y2="44" stroke="#c8f7c5" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="128" cy="40" r="8" fill="#ff4d4d"/>
+  <!-- detected blips -->
+  <circle cx="186" cy="92" r="6" fill="#8fd0ff"/>
+  <circle cx="74" cy="150" r="5" fill="#8fd0ff" opacity="0.8"/>
+</svg>
