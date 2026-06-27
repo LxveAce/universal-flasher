@@ -6,6 +6,24 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 
 > **Project status:** actively released, Beta. Universal Flasher is the standalone, device-agnostic flasher in this ecosystem. Broader device control work continues in the flagship successor project, **[cyber-controller](https://github.com/LxveAce/cyber-controller)** — this repo stays focused on the flashing/provisioning side and remains usable on its own.
 
+<!-- STATUS-ROADMAP:START -->
+## Status & Roadmap
+
+**Status:** Beta, actively shipping (latest release v1.1.1); source builds and the CI release pipeline are healthy and all four front-ends run on Python 3.13.
+
+**In progress / known issues:**
+- Hardening the prebuilt standalone binaries so bundled ESP32 flashing works reliably out of the box (source/pip installs are unaffected).
+- Unifying version metadata across the package, build, and changelog so the UI reports a single consistent version.
+- Cutting a fresh release so shipped binaries carry the latest in-tree fixes.
+
+**Roadmap:**
+- Add Tails OS (amnesiac) as a flashable USB target, with mandatory SHA256/OpenPGP integrity verification before writing and removable-only safety guards.
+- Add a "physical key" access gate (admin password and/or a recognized physical USB key) that runs before any front-end starts, with a documented headless/CI bypass and lost-key recovery story.
+- Lightweight CI smoke checks (compile/import plus a packaged-binary check) to catch packaging regressions early.
+- Reconcile and maintain the CHANGELOG as part of version unification.
+- Continued responsible hardening of the web UI controls (download allowlist, redirect handling, path-traversal guard, WebSocket auth token).
+<!-- STATUS-ROADMAP:END -->
+
 ---
 
 ## What This Does
