@@ -52,6 +52,8 @@ DATA_FILES = [
     (os.path.join(HERE, "web", "templates"), os.path.join("web", "templates")),
     (os.path.join(HERE, "GUIDE.md"), "."),
     (os.path.join(HERE, "assets", "icon.svg"), "assets"),
+    # Software-OS flashing catalog (Kali/Tails/Arch): bundle so --flash-os + the catalog work offline.
+    (os.path.join(HERE, "uf_core", "os_catalog.json"), "uf_core"),
 ]
 
 

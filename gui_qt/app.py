@@ -23,6 +23,24 @@ if getattr(sys, "frozen", False) and len(sys.argv) >= 2 and sys.argv[1] == "--__
     import esptool
     sys.exit(esptool.main(sys.argv[2:]))
 
+# Software-OS catalog CLI: list/flash bootable OS images (Kali/Tails/Arch) to USB without the GUI.
+if "--list-os" in sys.argv or "--flash-os" in sys.argv:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from uf_core import os_catalog as _oc
+    _p = argparse.ArgumentParser(prog="universal-flasher")
+    _p.add_argument("--list-os", action="store_true", help="List flashable OSes, then exit.")
+    _p.add_argument("--flash-os", default=None, metavar="ID", help="Flash an OS (kali/tails/arch) to USB.")
+    _p.add_argument("--os-image", default=None, help="Local OS image (.iso/.img) instead of downloading.")
+    _p.add_argument("--os-sig", default=None, help="Detached OpenPGP .sig for image_sig OSes.")
+    _p.add_argument("--os-target", default=None, help="Target removable device; skips the picker.")
+    _p.add_argument("--offline", action="store_true", help="Use the bundled (pinned) version.")
+    _p.add_argument("--yes", action="store_true", help="Skip the destructive-write confirmation.")
+    _a, _ = _p.parse_known_args()
+    if _a.list_os:
+        sys.exit(_oc.list_catalog_cli())
+    sys.exit(_oc.run_os_flash_cli(_a.flash_os, target=_a.os_target, image=_a.os_image,
+                                  sig=_a.os_sig, assume_yes=_a.yes, offline=_a.offline))
+
 import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -923,6 +941,13 @@ class MainWindow(QMainWindow):
         self._load_guide()
         gi = self.tabs.addTab(self.guide, "Guide")
         self.tabs.setTabToolTip(gi, "Usage guide (GUIDE.md).")
+        try:
+            from gui_qt.software_tab import SoftwareOSTab
+            self.software_os = SoftwareOSTab()
+            oi = self.tabs.addTab(self.software_os, "Software OS")
+            self.tabs.setTabToolTip(oi, "Flash a bootable OS (Kali / Tails / Arch) to a USB stick.")
+        except Exception as exc:  # noqa: BLE001 — never block the main UI on the optional OS tab
+            self.console.appendPlainText(f"[software-os] tab unavailable: {exc}")
         rl.addWidget(self.tabs, 1)
 
         raw = QHBoxLayout()
