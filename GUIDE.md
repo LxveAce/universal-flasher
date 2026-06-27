@@ -287,6 +287,31 @@ flash-encryption (T2) burning. The provisioner emits a **bundle**: a directory h
 
 ---
 
+## 9. Software OS (flash an OS to USB)
+
+Separate from board firmware, the **Software OS** tab writes a verified bootable operating system to a
+**USB stick** — **Kali** (pentest), **Tails** (amnesiac/Tor), or **Arch** (general).
+
+1. Open the **Software OS** tab and pick an OS.
+2. **Check latest** resolves the current version from the official source, or tick **Use bundled
+   version (offline)** to flash the version shipped with the app (no internet needed).
+3. Pick the **target USB** — only removable drives are listed, and the **whole drive is erased** — or
+   **Use local image…** if you already downloaded one.
+4. **Flash OS to USB**. The image is integrity-verified (SHA-256 + OpenPGP signature) before any write.
+
+The same thing from the command line:
+
+```
+universal-flasher --list-os
+universal-flasher --flash-os kali        # or tails / arch
+universal-flasher --flash-os arch --offline --os-target /dev/sdX --yes
+```
+
+The catalog auto-updates (a weekly job refreshes the bundled versions/checksums; the app also checks
+live), and everything still works offline from the bundled catalog + any local image.
+
+---
+
 ## Legal
 
 For **authorized security testing only** — networks/devices you own or have **written permission**
