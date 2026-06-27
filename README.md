@@ -17,11 +17,21 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 - Cutting a fresh release so shipped binaries carry the latest in-tree fixes.
 
 **Roadmap:**
+
+*Unified flasher (firmware + software in one app):*
+- Two clearly separate tabs in a single app: a **Firmware tab** for hardware targets (ESP32 Marauder / GhostESP / Bruce / etc. plus Raspberry Pi SD images) and a new **Software tab** for PC/USB operating systems.
+- The Software tab flashes full operating systems to USB — Kali Linux, Tails OS, Arch Linux (and more) — each integrity-verified (SHA256 / signature) before writing.
+- Auto-updating firmware/OS catalog so available versions stay current automatically, plus full **offline use**: a cached catalog and previously downloaded images flash with no internet connection. The app also self-updates.
+- In-app tooltips on every control and a thorough How-To / tutorial tab.
+
+*Other in-flight items:*
 - Add Tails OS (amnesiac) as a flashable USB target, with mandatory SHA256/OpenPGP integrity verification before writing and removable-only safety guards.
 - Add a "physical key" access gate (admin password and/or a recognized physical USB key) that runs before any front-end starts, with a documented headless/CI bypass and lost-key recovery story.
 - Lightweight CI smoke checks (compile/import plus a packaged-binary check) to catch packaging regressions early.
 - Reconcile and maintain the CHANGELOG as part of version unification.
 - Continued responsible hardening of the web UI controls (download allowlist, redirect handling, path-traversal guard, WebSocket auth token).
+
+> **Scope:** Universal Flasher is strictly the flasher (Firmware + Software tabs). All-in-one control — combining flashing, logging, pentest tooling, and lawful, owner-authorized wardriving (GPS-tagged AP/station capture with WiGLE/Kismet-style logging and export) — and the main cyberdeck GUI live in the separate flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)** project, not here.
 <!-- STATUS-ROADMAP:END -->
 
 ---
