@@ -4,6 +4,27 @@
 
 Public repo. Frame all security work as responsible hardening; do NOT publish step-by-step exploit/evasion recipes. Commit as LxveAce, no Claude co-author, no PII.
 
+## Progress — 2026-06-27 (this session)
+
+- **P0-1 DONE + build-verified:** frozen binaries can flash ESP32 again. Root cause was deeper than
+  "missing data": esptool ran via `sys.executable -m esptool`, which is the app (not Python) when
+  frozen. `flasher.esptool_argv()` is now frozen-aware (re-execs the app as a multi-call esptool
+  runner; `gui_qt/app.py` dispatches `--__uf-esptool__` -> `esptool.main()`), and `build.py` uses
+  `--collect-all esptool`. Verified on a real build: `universal-flasher.exe --__uf-esptool__ version`
+  -> `esptool v5.3.0`; 24 stub_flasher JSON bundled. (commit `d8ec823`)
+- **P0-2 DONE:** version unified to **1.3.1** (`uf_core/__init__` + `pyproject.toml` + CHANGELOG); UIs
+  read `uf_core.__version__`; added the CHANGELOG entry; fixed 5 CHANGELOG link refs that wrongly
+  pointed at the headless-marauder-gui repo. Removed the dead `build.py` ICON variable.
+- **P0-3 (cut release) PREPARED, not cut:** everything is ready for **v1.3.1**, but per the plan the
+  binaries must be hardware-flash-verified on a real ESP32 before re-publishing — left for the owner
+  to `gh release create v1.3.1` after that check.
+- **Feature directives (Tails flashing, physical-key gate): FLAGGED for the consolidation decision.**
+  Canonical, tested implementations already live in **cyber-controller** (the convergence flagship
+  that supersedes this repo). Per the agreed approach, not duplicating ~800 lines into the superseded
+  4-frontend structure until you decide: port here vs. point users to cyber-controller. (`uf_core`
+  already has `sd_backend` for the Tails writer; an access gate would need a `win_acl` port + wiring
+  all four front-end `main()`s.)
+
 ## Where this stands
 
 **What it is:** A Python multi-firmware flasher and device manager for ESP32 (Marauder, GhostESP, Bruce, HaleHound, Meshtastic, and more), Raspberry Pi (SD-image: Pwnagotchi, RaspyJack, Kali ARM), Flipper Zero (via qFlipper hand-off), and ADB-based security hardware (Orbic RC400L / RayHunter). A shared core library `uf_core/` (flasher, controllers, device_detect, sd_backend, adb_backend, cache, history, plugins, batch, backup, health, updater) is consumed by four interchangeable front-ends: PyQt5 desktop (`gui_qt/app.py`), Tkinter desktop (`gui/app.py`), Textual TUI (`tui/app.py`), and Flask+SocketIO web UI (`web/app.py`). Flashing is profile-driven — one `FirmwareProfile` subclass per ESP32 firmware (GitHub-release asset discovery + esptool chip auto-detect), with Pi/USB images handled separately by `sd_backend.py`. A vendored `suicide/` tree holds anti-forensic firmware sources + a provisioner.
