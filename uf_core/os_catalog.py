@@ -190,8 +190,11 @@ def _resolve_tails(entry: OSImage, on_line: Line) -> Resolved:
     img_url = _require_os_url(found["url"])
     base = os.path.basename(urllib.parse.urlsplit(img_url).path)
     sig_url = _require_os_url(f"https://tails.net/torrents/files/{base}.sig")
-    ver = data.get("version") if isinstance(data, dict) else None
-    return Resolved(image_id=entry.id, version=str(ver or "?"), image_url=img_url,
+    ver = str((data.get("version") if isinstance(data, dict) else None) or "").strip()
+    if not ver or ver.lower() == "none":
+        m = re.search(r"tails-amd64-([0-9][0-9.]*)\.img", base)
+        ver = m.group(1) if m else "?"
+    return Resolved(image_id=entry.id, version=ver, image_url=img_url,
                     image_type=entry.image_type, verify_model="image_sig", sig_url=sig_url,
                     sha256=found.get("sha256"), gpg_fingerprint=entry.gpg_fingerprint)
 
