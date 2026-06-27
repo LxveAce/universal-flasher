@@ -110,3 +110,45 @@ Public repo. Frame all security work as responsible hardening; do NOT publish st
 - Directive 2: usability gate or real security boundary? Lost-key recovery/bypass story? Web + headless/CI handling?
 - Is cyber-controller's flash core shared code, a vendored copy, or a rewrite of this repo's?
 - cyber-controller is the installer-shipping flagship per the orchestration note, but no recon verified its current release/installer state — confirm before assuming it is release-ready.
+
+
+## Owner feature directives — unified flashing + auto-update + offline + UX (2026-06-27)
+
+Committed roadmap for the flasher line. **cyber-controller and universal-flasher implement the
+FLASHING parts CONSISTENTLY (shared engine + catalog); their ROLES differ (see below).** These are
+to be kept in sync across both repos.
+
+### 1. Flash more, all in one — firmware vs software, in separate tabs
+- Make flashing all-in-one, split into clearly separated tabs so the two audiences never collide:
+  - **Firmware tab (hardware projects):** the existing ESP32 firmwares (Marauder, GhostESP, Bruce,
+    HaleHound, Meshtastic, ...) + Pi/SBC SD-image firmwares. Add as many more as feasible.
+  - **NEW Software tab (PC / USB operating systems):** bootable OS images written to a USB stick —
+    **Kali Linux, Tails OS, Arch Linux**, and as many others as feasible (Ubuntu/Debian/Parrot, and a
+    Ventoy-style multiboot stretch goal). Reuses the hardened **removable-only raw-image writer +
+    mandatory integrity verification** (sha256 / signature) already used for Tails.
+
+### 2. Auto-updating catalog + app, with FULL offline utility
+- **Catalog auto-update:** keep the flashable firmware/OS definitions as current as possible
+  automatically — resolve each upstream's latest version (GitHub Releases API for ESP32 firmwares;
+  official version/checksum/signature feeds for Kali / Tails / Arch / etc.) and refresh the bundled
+  profiles. Do it two ways: (a) a **scheduled CI job** (GitHub Action) that updates the profile JSON +
+  pinned checksums in the repo so the shipped catalog never goes stale, and (b) an **in-app
+  "check for catalog updates"** that pulls the latest profile manifest.
+- **App auto-update:** keep the existing self-update path; every project in this line ships auto-update.
+- **Offline utility (mandatory, non-negotiable):** everything must work with NO internet — a cached
+  catalog + already-downloaded images flash fully offline. Auto-update is an enhancement, never a
+  requirement to use the tool in the field.
+
+### 3. UX — discoverability everywhere
+- **Hover tooltips on EVERY control** explaining what it does (extend the existing tooltip/glossary
+  pattern to 100% coverage).
+- **A thorough "How To" / tutorial tab** that walks through every feature, tab, and button with
+  step-by-step usage — first-run friendly, offline, and kept in sync as features land.
+
+### Role: universal-flasher = STRICTLY a flasher
+universal-flasher stays focused: the unified firmware + software flashing above, auto-updating
+catalog, offline utility, tooltips, and How-To tab — and nothing else. **No controller / logger /
+wardriving** (those live in cyber-controller). The flashing engine + catalog manifest should be the
+shared, consistent core between the two repos so a firmware/OS added in one is trivially available in
+the other.
+
