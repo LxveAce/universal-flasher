@@ -4,34 +4,29 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 
 **Built on the [Headless Marauder GUI](https://github.com/LxveAce/headless-marauder-gui) scaffold.**
 
-> **Project status:** actively released, Beta. Universal Flasher is the standalone, device-agnostic flasher in this ecosystem. Broader device control work continues in the flagship successor project, **[cyber-controller](https://github.com/LxveAce/cyber-controller)** — this repo stays focused on the flashing/provisioning side and remains usable on its own.
+> **Project status:** actively released, Beta. Universal Flasher is the standalone, device-agnostic flasher in this ecosystem — firmware plus Software-OS flashing (Kali/Tails/Arch to USB), shipped in v1.4.0. Broader all-in-one device control (controller, logger, wardriving, access gate) ships in the flagship successor project, **[cyber-controller](https://github.com/LxveAce/cyber-controller)** (v1.2.1) — this repo stays focused on the flashing/provisioning side and remains usable on its own.
 
 <!-- STATUS-ROADMAP:START -->
 ## Status & Roadmap
 
-**Status:** Beta, actively shipping (latest release v1.1.1); source builds and the CI release pipeline are healthy and all four front-ends run on Python 3.13.
+**Status:** Beta, actively shipping (latest release v1.4.0); source builds and the CI release pipeline are healthy and all four front-ends run on Python 3.13.
+
+**Shipped (v1.4.0):**
+- **Software-OS flashing** — flash full operating systems to USB: Kali Linux, Tails OS, and Arch Linux, each integrity-verified (SHA256 / signature) before writing, alongside the existing ESP32 firmware flasher. Available from the CLI via `--list-os` / `--flash-os`.
+- **Auto-updating OS catalog** — a weekly CI job keeps the bundled OS catalog current; latest versions auto-resolve, and everything works fully **offline** from a cached catalog and previously downloaded images.
 
 **In progress / known issues:**
 - Hardening the prebuilt standalone binaries so bundled ESP32 flashing works reliably out of the box (source/pip installs are unaffected).
 - Unifying version metadata across the package, build, and changelog so the UI reports a single consistent version.
-- Cutting a fresh release so shipped binaries carry the latest in-tree fixes.
 
 **Roadmap:**
 
-*Unified flasher (firmware + software in one app):*
-- Two clearly separate tabs in a single app: a **Firmware tab** for hardware targets (ESP32 Marauder / GhostESP / Bruce / etc. plus Raspberry Pi SD images) and a new **Software tab** for PC/USB operating systems.
-- The Software tab flashes full operating systems to USB — Kali Linux, Tails OS, Arch Linux (and more) — each integrity-verified (SHA256 / signature) before writing.
-- Auto-updating firmware/OS catalog so available versions stay current automatically, plus full **offline use**: a cached catalog and previously downloaded images flash with no internet connection. The app also self-updates.
-- In-app tooltips on every control and a thorough How-To / tutorial tab.
-
-*Other in-flight items:*
-- Add Tails OS (amnesiac) as a flashable USB target, with mandatory SHA256/OpenPGP integrity verification before writing and removable-only safety guards.
-- Add a "physical key" access gate (admin password and/or a recognized physical USB key) that runs before any front-end starts, with a documented headless/CI bypass and lost-key recovery story.
 - Lightweight CI smoke checks (compile/import plus a packaged-binary check) to catch packaging regressions early.
 - Reconcile and maintain the CHANGELOG as part of version unification.
 - Continued responsible hardening of the web UI controls (download allowlist, redirect handling, path-traversal guard, WebSocket auth token).
+- In-app tooltips on every control and a thorough How-To / tutorial tab.
 
-> **Scope:** Universal Flasher is strictly the flasher (Firmware + Software tabs). All-in-one control — combining flashing, logging, pentest tooling, and lawful, owner-authorized wardriving (GPS-tagged AP/station capture with WiGLE/Kismet-style logging and export) — and the main cyberdeck GUI live in the separate flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)** project, not here.
+> **Scope:** Universal Flasher is strictly the flasher (Firmware + Software flashing) — no controller, logger, or wardriving. All-in-one control — combining flashing, logging, pentest tooling, lawful, owner-authorized wardriving (GPS-tagged Wi-Fi capture exported to WiGLE CSV), and an in-app Access-Gate setup (admin password / physical USB key, salted-scrypt + encrypted vault) — plus the main cyberdeck GUI ship in the separate flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)** project (latest release v1.2.1), not here.
 <!-- STATUS-ROADMAP:END -->
 
 ---
@@ -40,7 +35,7 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 
 Replaces several separate tools (esptool CLI, Arduino IDE, PlatformIO, Meshtastic Web Flasher, qFlipper, Raspberry Pi Imager, ADB manual commands) with a single application.
 
-Select your device from a dropdown, pick the firmware, click FLASH.
+Select your device from a dropdown, pick the firmware, click FLASH. As of v1.4.0 it also flashes full operating systems to USB — Kali Linux, Tails OS, and Arch Linux — with an auto-updating, offline-capable catalog (`--list-os` / `--flash-os`).
 
 ## Supported Firmware
 
