@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0] — 2026-06-27
+
+Software-OS flashing — flash whole operating systems to USB, alongside firmware.
+
+**Added:**
+- **Software OS tab + `--list-os` / `--flash-os` CLI** — write verified bootable **Kali, Tails, and
+  Arch** images to a removable USB, separate from board firmware. The latest version is auto-resolved
+  from the official source (Kali `SHA256SUMS`, Arch releng JSON feed, Tails feed); the bundled catalog
+  works fully **offline**; every image is integrity-verified (SHA-256 + OpenPGP signature) before write,
+  reusing the hardened removable-only raw-image writer.
+- A weekly CI job (`update-os-catalog.yml`) that opens a PR refreshing the bundled OS versions/checksums.
+- Tooltips on the new controls; the Field Guide now documents the Software-OS flow.
+- Test suite added (`tests/`): OS catalog (12) + Software-OS tab smoke (1).
+
 ## [1.3.1] — 2026-06-27
 
 Frozen-binary flashing fix + version reconciliation.

@@ -2,7 +2,7 @@
 detection, and management for ESP32, Raspberry Pi, Flipper Zero, and ADB-based
 security hardware. Built on the Headless Marauder scaffold."""
 
-__version__ = "1.3.1"
+__version__ = "1.4.0"
 
 from .controller import MarauderController
 from .parsing import MarauderParser, AP, Station
