@@ -16,6 +16,13 @@ import argparse
 import os
 import queue
 import sys
+
+# Multi-call binary: when the frozen build re-execs itself to run esptool
+# (see uf_core.flasher.esptool_argv), dispatch here before importing the GUI stack.
+if getattr(sys, "frozen", False) and len(sys.argv) >= 2 and sys.argv[1] == "--__uf-esptool__":
+    import esptool
+    sys.exit(esptool.main(sys.argv[2:]))
+
 import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

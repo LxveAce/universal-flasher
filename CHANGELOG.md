@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.1] — 2026-06-27
+
+Frozen-binary flashing fix + version reconciliation.
+
+**Fixed:**
+- Standalone binaries could not flash ESP32. esptool was invoked as `sys.executable -m esptool`,
+  which under a PyInstaller build is the app itself (not Python), and esptool's package data
+  (targets/stub_flasher JSON) was never bundled. The binary now acts as a multi-call esptool
+  runner (re-execs itself, dispatches to `esptool.main()`) and bundles esptool fully
+  (`--collect-all esptool`). Source / `pip install` runs were unaffected.
+- Version drift: `uf_core.__version__`, `pyproject.toml`, and this CHANGELOG now agree (1.3.1);
+  the UIs read the version from `uf_core.__version__`, so binaries no longer show a stale "v1.0.0".
+- build.py: removed a dead ICON variable.
+
 ## [1.3.0] — 2026-06-09
 
 Multi-firmware flasher, Suicide-build support, standalone builds, and security hardening.
@@ -76,8 +90,8 @@ Initial release.
 - `--mock` mode for dev/demo without hardware
 - MIT License
 
-[1.3.0]: https://github.com/LxveAce/headless-marauder-gui/releases/tag/v1.3.0
-[1.2.0]: https://github.com/LxveAce/headless-marauder-gui/releases/tag/v1.2.0
-[1.1.0]: https://github.com/LxveAce/headless-marauder-gui/releases/tag/v1.1.0
-[1.0.1]: https://github.com/LxveAce/headless-marauder-gui/releases/tag/v1.0.1
-[1.0.0]: https://github.com/LxveAce/headless-marauder-gui/releases/tag/v1.0.0
+[1.3.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.3.0
+[1.2.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.2.0
+[1.1.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.1.0
+[1.0.1]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.0.1
+[1.0.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.0.0

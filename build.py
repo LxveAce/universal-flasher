@@ -16,7 +16,6 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ICON = os.path.join(HERE, "assets", "icon.svg")
 
 HIDDEN_IMPORTS = [
     "uf_core",
@@ -41,7 +40,6 @@ HIDDEN_IMPORTS = [
     "serial",
     "serial.tools",
     "serial.tools.list_ports",
-    "esptool",
     "requests",
     "psutil",
     "flask",
@@ -78,6 +76,11 @@ def build(onefile=False):
 
     for mod in HIDDEN_IMPORTS:
         cmd += ["--hidden-import", mod]
+
+    # esptool loads package DATA at runtime (targets/stub_flasher/*.json). A bare
+    # --hidden-import ships the module but NOT that data, so a frozen binary cannot flash.
+    # --collect-all pulls esptool's submodules + data + binaries into the bundle.
+    cmd += ["--collect-all", "esptool"]
 
     for src, dst in DATA_FILES:
         sep = ";" if platform.system() == "Windows" else ":"

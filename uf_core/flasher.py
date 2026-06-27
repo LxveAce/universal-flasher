@@ -183,7 +183,16 @@ def _variant_label(name: str) -> str:
 # esptool plumbing  (shared by every profile)
 # --------------------------------------------------------------------------- #
 
+# When frozen (PyInstaller), sys.executable is THIS app, not a Python interpreter, so
+# `sys.executable -m esptool` cannot work. We re-exec the frozen app as a multi-call binary:
+# the front-end entry dispatches the ESPTOOL_SUBCMD flag to esptool.main() (esptool is bundled
+# via --collect-all esptool in build.py). Source / pip runs use the normal `python -m esptool`.
+ESPTOOL_SUBCMD = "--__uf-esptool__"
+
+
 def esptool_argv(*args: str) -> List[str]:
+    if getattr(sys, "frozen", False):
+        return [sys.executable, ESPTOOL_SUBCMD, *args]
     return [sys.executable, "-m", "esptool", *args]
 
 
