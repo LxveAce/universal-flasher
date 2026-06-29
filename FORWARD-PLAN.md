@@ -1,6 +1,13 @@
 # LxveAce/universal-flasher - Forward Plan
 
-> Status: Beta, actively shipping (latest release v1.1.1). Health: YELLOW. Last planned: 2026-06-27. (Replace date placeholder when revising.)
+> Status: Beta, actively shipping (latest release v1.4.0). Health: YELLOW. Last planned: 2026-06-27. (Replace date placeholder when revising.)
+
+> **⭐ MAJOR DIRECTION (2026-06-29): this repo is becoming the home of a single, UI-free flashing ENGINE
+> (firmware + OS catalogs, backends, parsers, per-board offsets) plus a light standalone UI. Cyber
+> Controller will consume that engine as a dependency rather than carrying its own copy, ending the
+> two-codebase drift. The engine is seeded from Cyber Controller's flash core (the more complete base).
+> Goal: adding a new firmware/OS/board = drop one data file. The "cross-repo de-dup" dig-deeper item
+> below is folded into this effort. Staged, test-gated, with a real-hardware flash before any release.**
 
 Public repo. Frame all security work as responsible hardening; do NOT publish step-by-step exploit/evasion recipes. Commit as LxveAce, no Claude co-author, no PII.
 
