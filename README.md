@@ -1,5 +1,7 @@
 # Universal Flasher
 
+> ⚠️ **Authorized, lawful use only.** A security-research tool — use it only on systems you own or have explicit permission to test. Provided as-is, no warranty; you assume all risk. See [DISCLAIMER.md](DISCLAIMER.md).
+
 Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero, and ADB-based security hardware. One app flashes, controls, and manages every device in your cyberdeck — or any standalone security build.
 
 **Built on the [Headless Marauder GUI](https://github.com/LxveAce/headless-marauder-gui) scaffold.**
