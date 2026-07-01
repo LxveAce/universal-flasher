@@ -76,6 +76,13 @@ class GenericSerialController:
         with self._subs_lock:
             self._subs.append(cb)
 
+    def unsubscribe(self, cb: Line):
+        with self._subs_lock:
+            try:
+                self._subs.remove(cb)
+            except ValueError:
+                pass
+
     def _emit(self, line: str):
         with self._buffer_lock:
             self._buffer.append(line)
@@ -118,12 +125,22 @@ class GenericSerialController:
             self.ser.write((command.strip() + "\n").encode())
 
     def send_and_capture(self, command: str, wait_ms: int = 500) -> List[str]:
-        """Send a command and capture response lines for `wait_ms` milliseconds."""
-        start_idx = len(self._buffer)
-        self.send(command)
-        time.sleep(wait_ms / 1000.0)
-        with self._buffer_lock:
-            return list(self._buffer[start_idx:])
+        """Send a command and capture response lines for `wait_ms` milliseconds.
+
+        Captures via a temporary subscriber rather than a saved buffer offset: the ring
+        buffer pops from the front once it hits its 500-line cap, so an absolute start index
+        goes stale on a chatty device and silently returns nothing. Subscribing is immune to
+        that — we collect exactly the lines emitted between the command and the deadline.
+        """
+        collected: List[str] = []
+        collector = collected.append
+        self.subscribe(collector)
+        try:
+            self.send(command)
+            time.sleep(wait_ms / 1000.0)
+        finally:
+            self.unsubscribe(collector)
+        return collected
 
     def get_buffer(self, last_n: int = 50) -> List[str]:
         with self._buffer_lock:
