@@ -1,13 +1,31 @@
 # Universal Flasher — Python dependencies (install in a venv)
 #
-# Tkinter (the desktop GUI) is NOT a pip package — it ships with Python.
-# On Kali/Debian install it once via apt:   sudo apt install -y python3-tk
+# This file mirrors pyproject.toml's dependency model: a small always-installed
+# CORE, plus per-front-end UI EXTRAS. Installing this file gives a full multi-UI
+# development/build environment. For a leaner install, prefer pyproject extras:
+#
+#     pip install .            # core only
+#     pip install .[qt]        # + PyQt5 desktop GUI
+#     pip install .[tui]       # + Textual terminal UI
+#     pip install .[web]       # + Flask browser UI
+#     pip install .[all]       # everything above
+#
+# Tkinter (the lightweight desktop GUI) is NOT a pip package — it ships with
+# Python. On Kali/Debian install it once via apt:  sudo apt install -y python3-tk
+#
+# The suicide-build provisioner's NVS generator (esp-idf-nvs-partition-gen) is
+# NOT a base dependency — it lives in suicide/host_requirements.txt, pinned where
+# it is actually used.
 
+# --- Core (matches pyproject [project].dependencies) ------------------------
 pyserial>=3.5       # serial link to boards (all apps)
-textual>=0.50       # terminal UI (tui/app.py only)
 esptool>=4.7,<6     # ESP32 firmware flashing
-flask>=3.0          # browser UI backend (web/app.py)
-flask-socketio>=5.3 # real-time WebSocket push for browser UI
 requests>=2.28      # firmware downloads, API checks
 psutil>=5.9         # USB device detection, system monitoring
-esp-idf-nvs-partition-gen==0.2.0  # NVS image generator for suicide-build provisioner
+
+# --- UI extras (matches pyproject [project.optional-dependencies]) ----------
+# PyQt5 (the [qt] extra) is installed separately by install.sh/.bat and CI so
+# apt's system PyQt5 can be reused; add it here if you want it in this file too.
+textual>=0.50       # [tui]  terminal UI (tui/app.py only)
+flask>=3.0          # [web]  browser UI backend (web/app.py)
+flask-socketio>=5.3 # [web]  real-time WebSocket push for browser UI
