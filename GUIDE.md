@@ -299,12 +299,13 @@ Separate from board firmware, the **Software OS** tab writes a verified bootable
    **Use local image…** if you already downloaded one.
 4. **Flash OS to USB**. The image is integrity-verified (SHA-256 + OpenPGP signature) before any write.
 
-The same thing from the command line:
+The same thing from the command line. OS flashing is currently exposed through the Qt
+front end, so use the `universal-flasher-qt` entry point (or `python gui_qt/app.py`):
 
 ```
-universal-flasher --list-os
-universal-flasher --flash-os kali        # or tails / arch
-universal-flasher --flash-os arch --offline --os-target /dev/sdX --yes
+universal-flasher-qt --list-os
+universal-flasher-qt --flash-os kali        # or tails / arch
+universal-flasher-qt --flash-os arch --offline --os-target /dev/sdX --yes
 ```
 
 The catalog auto-updates (a weekly job refreshes the bundled versions/checksums; the app also checks

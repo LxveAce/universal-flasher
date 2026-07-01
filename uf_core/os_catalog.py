@@ -407,7 +407,7 @@ def list_catalog_cli() -> int:
     for i in load_catalog():
         print(f"  {i.id:<8} {i.name:<22} [{i.category}] ({i.image_type})")
         print(f"           {i.description}")
-    print("\nFlash with:  universal-flasher --flash-os <id> [--os-image <local.iso/.img>] "
+    print("\nFlash with:  universal-flasher-qt --flash-os <id> [--os-image <local.iso/.img>] "
           "[--os-target <device>] [--offline] [--yes]")
     return 0
 

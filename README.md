@@ -14,7 +14,7 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 **Status:** Beta, actively shipping (latest release v1.4.0); source builds and the CI release pipeline are healthy and all four front-ends run on Python 3.13.
 
 **Shipped (v1.4.0):**
-- **Software-OS flashing** — flash full operating systems to USB: Kali Linux, Tails OS, and Arch Linux, each integrity-verified (SHA256 / signature) before writing, alongside the existing ESP32 firmware flasher. Available from the CLI via `--list-os` / `--flash-os`.
+- **Software-OS flashing** — flash full operating systems to USB: Kali Linux, Tails OS, and Arch Linux, each integrity-verified (SHA256 / signature) before writing, alongside the existing ESP32 firmware flasher. Available from the Qt front end's CLI: `universal-flasher-qt --list-os` / `--flash-os`.
 - **Auto-updating OS catalog** — a weekly CI job keeps the bundled OS catalog current; latest versions auto-resolve, and everything works fully **offline** from a cached catalog and previously downloaded images.
 
 **In progress / known issues:**
@@ -37,7 +37,7 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 
 Replaces several separate tools (esptool CLI, Arduino IDE, PlatformIO, Meshtastic Web Flasher, qFlipper, Raspberry Pi Imager, ADB manual commands) with a single application.
 
-Select your device from a dropdown, pick the firmware, click FLASH. As of v1.4.0 it also flashes full operating systems to USB — Kali Linux, Tails OS, and Arch Linux — with an auto-updating, offline-capable catalog (`--list-os` / `--flash-os`).
+Select your device from a dropdown, pick the firmware, click FLASH. As of v1.4.0 it also flashes full operating systems to USB — Kali Linux, Tails OS, and Arch Linux — with an auto-updating, offline-capable catalog (`universal-flasher-qt --list-os` / `--flash-os`).
 
 ## Supported Firmware
 
