@@ -1,5 +1,10 @@
 # Changelog
 
+> **Git tags / GitHub releases:** only **v1.1.0**, **v1.1.1**, and **v1.4.0** are tagged.
+> The version headings below without a `[bracketed]` link (1.0.0, 1.0.1, 1.2.0, 1.3.0, 1.3.1)
+> record development milestones that were folded into those tagged releases — they were never
+> cut as standalone git tags. Retro-tagging any of them is an owner decision.
+
 ## [1.4.0] — 2026-06-27
 
 Software-OS flashing — flash whole operating systems to USB, alongside firmware.
@@ -14,7 +19,7 @@ Software-OS flashing — flash whole operating systems to USB, alongside firmwar
 - Tooltips on the new controls; the Field Guide now documents the Software-OS flow.
 - Test suite added (`tests/`): OS catalog (12) + Software-OS tab smoke (1).
 
-## [1.3.1] — 2026-06-27
+## 1.3.1 — 2026-06-27 (development milestone — never git-tagged)
 
 Frozen-binary flashing fix + version reconciliation.
 
@@ -28,7 +33,7 @@ Frozen-binary flashing fix + version reconciliation.
   the UIs read the version from `uf_core.__version__`, so binaries no longer show a stale "v1.0.0".
 - build.py: removed a dead ICON variable.
 
-## [1.3.0] — 2026-06-09
+## 1.3.0 — 2026-06-09 (development milestone — never git-tagged)
 
 Multi-firmware flasher, Suicide-build support, standalone builds, and security hardening.
 
@@ -52,7 +57,7 @@ Multi-firmware flasher, Suicide-build support, standalone builds, and security h
 - README updated with standalone binary download links and ARM64 instructions
 - Docs cleanup (SECURITY.md, DISCLAIMER.md, CONTRIBUTING.md trimmed)
 
-## [1.2.0] — 2026-06-08
+## 1.2.0 — 2026-06-08 (development milestone — never git-tagged)
 
 Added a browser-based UI, standalone executables, and project policies.
 
@@ -76,6 +81,17 @@ Added a browser-based UI, standalone executables, and project policies.
 - Installers now include the web UI launcher
 - README updated with browser UI docs
 
+## [1.1.1] — 2026-06-10
+
+Vendored Suicide-Marauder sync + provisioner hardening (red-team round 3).
+
+**Changed:**
+- Synced the vendored Suicide-Marauder bundle to its canonical upstream.
+
+**Security:**
+- Red-team round 3 hardening of the provisioning / integrity-verify path: encryption-aware
+  verification, resume convergence, factory/scratch coverage, and RAM scrub.
+
 ## [1.1.0] — 2026-06-08
 
 Cross-platform release — Windows support, pip install.
@@ -85,13 +101,13 @@ Cross-platform release — Windows support, pip install.
 - `pyproject.toml` with optional dep groups (`[qt]`, `[tui]`, `[all]`)
 - Updated `install.sh` / `uninstall.sh` with TUI launcher
 
-## [1.0.1] — 2026-06-08
+## 1.0.1 — 2026-06-08 (development milestone — never git-tagged)
 
 - In-app Guide tab with full tool reference
 - `GUIDE.md` — attack chaining walkthrough and integration guide for other tools
 - Hover tooltips on all command buttons
 
-## [1.0.0] — 2026-06-08
+## 1.0.0 — 2026-06-08 (development milestone — never git-tagged)
 
 Initial release.
 
@@ -104,8 +120,8 @@ Initial release.
 - `--mock` mode for dev/demo without hardware
 - MIT License
 
-[1.3.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.3.0
-[1.2.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.2.0
+<!-- Only the three git-tagged releases are linked; the other headings above are
+     never-tagged development milestones (see the note at the top of this file). -->
+[1.4.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.4.0
+[1.1.1]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.1.1
 [1.1.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.1.0
-[1.0.1]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.0.1
-[1.0.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.0.0
