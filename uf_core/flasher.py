@@ -125,8 +125,31 @@ Line = Callable[[str], None]
 IMAGE_MERGED = "merged-single-bin"      # one .bin holds bootloader+partitions+app, flash at its offset
 IMAGE_MULTI = "multi-file-offsets"      # app .bin only; needs separate bootloader/partitions/boot_app0
 
-# bootloader sits at 0x0 on S3 and the RISC-V parts, 0x1000 on classic ESP32 / S2
-_BOOTLOADER_0 = {"esp32s3", "esp32c2", "esp32c3", "esp32c6", "esp32c5", "esp32h2"}
+# Second-stage bootloader flash offset, per chip. This MUST match esptool's per-target
+# BOOTLOADER_FLASH_OFFSET or the board won't boot — the bootloader gets written to the wrong
+# address. Three groups (verified against esptool 5.x targets):
+#   * classic ESP32 / S2                         -> 0x1000
+#   * ESP32-C5 / P4 / H4                         -> 0x2000  (NOT 0x0 — the well-known C5 gotcha)
+#   * S3 and the other RISC-V parts (C2/C3/C6/C61/H2) -> 0x0
+# _bootloader_offset() is the single source of truth; use it everywhere instead of an inline
+# 0x0-vs-0x1000 test (which silently mis-placed the C5 bootloader at 0x0 and bricked boot).
+_BOOTLOADER_1000 = {"esp32", "esp32s2"}
+_BOOTLOADER_2000 = {"esp32c5", "esp32p4", "esp32h4"}
+_BOOTLOADER_0 = {"esp32s3", "esp32c2", "esp32c3", "esp32c6", "esp32c61", "esp32h2"}
+
+
+def _bootloader_offset(chip: str) -> str:
+    """Return the hex flash offset of the second-stage bootloader for `chip`.
+
+    Mirrors esptool's per-target BOOTLOADER_FLASH_OFFSET. Writing the bootloader to the wrong
+    offset stops the chip from booting, so ESP32-C5 (and P4 / H4) MUST use 0x2000, classic
+    ESP32 / S2 use 0x1000, and S3 / the other RISC-V parts use 0x0.
+    """
+    if chip in _BOOTLOADER_2000:
+        return "0x2000"
+    if chip in _BOOTLOADER_1000:
+        return "0x1000"
+    return "0x0"
 
 # FlashFiles dir that holds bootloader+partitions for each chip family
 _SUPPORT_DIR = {
@@ -470,7 +493,7 @@ class MarauderProfile(FirmwareProfile):
         boot = _fetch_flashfile(f"{sdir}/{_BOOTLOADER_NAME}", os.path.join(cache, f"{chip}_bootloader.bin"), on_line)
         part = _fetch_flashfile(f"{sdir}/{_PARTITIONS_NAME}", os.path.join(cache, f"{chip}_partitions.bin"), on_line)
         bapp = _fetch_flashfile(_BOOT_APP0_PATH, os.path.join(cache, "boot_app0.bin"), on_line)
-        bl_off = "0x0" if chip in _BOOTLOADER_0 else "0x1000"
+        bl_off = _bootloader_offset(chip)
         return {bl_off: boot, "0x8000": part, "0xe000": bapp}
 
 
@@ -555,7 +578,7 @@ class Esp32DivProfile(FirmwareProfile):
         boot = _fetch_div_file(_DIV_BOOTLOADER, os.path.join(cache, f"div_{chip}_bootloader.bin"), on_line)
         part = _fetch_div_file(_DIV_PARTITIONS, os.path.join(cache, f"div_{chip}_partitions.bin"), on_line)
         bapp = _fetch_div_file(_DIV_BOOT_APP0, os.path.join(cache, "div_boot_app0.bin"), on_line)
-        bl_off = "0x0" if chip in _BOOTLOADER_0 else "0x1000"
+        bl_off = _bootloader_offset(chip)
         return {bl_off: boot, "0x8000": part, "0xe000": bapp}
 
     def app_offset(self, chip: str) -> str:
