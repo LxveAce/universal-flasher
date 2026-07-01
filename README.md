@@ -113,7 +113,7 @@ Drop a `.json` profile into `~/.universal-flasher/plugins/` (or `%LOCALAPPDATA%\
 | **Textual** (terminal) | `python tui/app.py` | SSH sessions, headless Kali, no X11 needed |
 | **Flask** (browser) | `python web/app.py` | Remote access at `http://localhost:5000` |
 
-All four UIs share the same `uf_core` library and support the full firmware profile list. After a `pip install`, the same entry points are available as console scripts: `universal-flasher-qt`, `universal-flasher-tk`, `universal-flasher-tui`, and `universal-flasher-web`.
+All four UIs share the same `uf_core` library and support the full firmware profile list. (Software-OS flashing — the Kali / Tails / Arch-to-USB feature — is currently wired only into the Qt CLI: `universal-flasher-qt --list-os` / `--flash-os`.) After a `pip install`, the same entry points are available as console scripts: `universal-flasher-qt`, `universal-flasher-tk`, `universal-flasher-tui`, and `universal-flasher-web`.
 
 ## Flash Backends
 

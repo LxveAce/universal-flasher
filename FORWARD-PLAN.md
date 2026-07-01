@@ -1,6 +1,9 @@
 # LxveAce/universal-flasher - Forward Plan
 
-> Status: Beta, actively shipping (latest release v1.4.0). Health: YELLOW. Last planned: 2026-06-27. (Replace date placeholder when revising.)
+> Status: beta, shipping — latest release **v1.4.0**. The version's unified across `uf_core`, `pyproject`, and
+> the CHANGELOG, and the ESP32-C5 bootloader-offset fix is in. Health: green. Last revised 2026-07-01. The old
+> P0s further down (esptool bundling, four-way version drift, cutting a clean release) are all done — kept for
+> history. Current direction: this repo is the shared, UI-free flash **engine**; active planning lives in command-center.
 
 > **⭐ MAJOR DIRECTION (2026-06-29): this repo is becoming the home of a single, UI-free flashing ENGINE
 > (firmware + OS catalogs, backends, parsers, per-board offsets) plus a light standalone UI. Cyber
@@ -42,9 +45,12 @@ Public repo. Frame all security work as responsible hardening; do NOT publish st
 - Install: `pip install -e .[all]` (extras: `[qt]`/`[tui]`/`[web]`/`[all]`). Console scripts: `universal-flasher-{qt,tk,tui,web}` -> `{gui_qt,gui,tui,web}.app:main`.
 - Standalone binaries: `python build.py --onefile` (PyInstaller). CI builds all 4 platforms on each GitHub release via `.github/workflows/build-release.yml`.
 
-**Current state:** All Python sources compile under 3.13; `import uf_core` succeeds with core deps. CI release workflow is functional (v1.1.1 has all 4 platform assets, downloads verified working — Windows .exe returns a valid MZ header). No open GitHub issues, no real TODO/FIXME markers. Healthy — BUT two real defects gate confidence: a probable esptool-data-bundling failure in the prebuilt binaries (breaks the headline ESP32 feature), and inconsistent version metadata.
+**Current state:** `import uf_core` compiles on 3.13 and the release workflow ships all four platform assets. Version is unified at **1.4.0** everywhere, and the two defects that used to gate confidence are both fixed: the binaries now bundle esptool's runtime data (`build.py` uses `--collect-all esptool`, so a frozen build actually flashes ESP32), and the version metadata is consistent. No open issues. The repo is healthy, and its role now is the shared, UI-free flash engine (see the direction note up top).
 
-## P0 - do first
+## P0 — DONE (historical, kept for provenance)
+
+> All three P0s below shipped by **v1.4.0**: esptool data is bundled (`build.py` → `--collect-all esptool`),
+> the version is unified to 1.4.0 in all four places, and a clean release was cut. Left here so the history reads straight.
 
 1. **Fix esptool data bundling in the release binaries (the headline feature is probably broken).** `build.py` bundles esptool via `--hidden-import esptool` only (build.py:44) and its `DATA_FILES` (build.py:53-57) never collects esptool's package data (flasher-stub / targets JSON). `--hidden-import` pulls the module but NOT its data files — the documented PyInstaller+esptool pitfall. Since esptool is the flash backend for every ESP32 firmware, all 4 prebuilt binaries likely fail ESP32 flashing with a missing-stub/targets error. Fix with PyInstaller `--collect-data esptool` (or `--collect-all esptool`, or a runtime hook). **Then VERIFY**: build a binary and confirm it actually detects + flashes a real ESP32 before re-publishing. (Source/pip installs are unaffected — they use the system esptool with data intact.)
 2. **Unify the four-way version.** `uf_core/__init__.py:5` says `1.0.0` (this is what the Qt About dialog gui_qt/app.py:1158 and web/app.py:106 show users), `pyproject.toml` says `1.1.0`, the published release is `v1.1.1`, and `CHANGELOG.md` top header is `[1.3.0]`. Pick ONE next number, set it in all four places, add the missing CHANGELOG entry for the already-published v1.1.1, and resolve the orphaned 1.3.0 header (drop or promote). Today users on v1.1.1 see "v1.0.0" in the UI.
