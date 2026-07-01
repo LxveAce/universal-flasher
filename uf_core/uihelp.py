@@ -12,9 +12,18 @@ suicide-bundle panel) can reuse one copy instead of redefining its own:
 Nothing here touches hardware, the network, or the flasher; it is pure presentation.
 Importing this module does not require a running Tk root — the Toplevel for a
 tooltip is only created on first hover.
+
+Tkinter is imported softly: on a headless / no-Tk box (e.g. Kali without
+python3-tk, or the Textual TUI / web front ends) ``import uf_core.uihelp`` must
+still succeed so the plain-data GLOSSARY stays reachable. Tk is only actually
+required to *use* the Tooltip class, which by construction already needs a live
+Tk widget, so a real Tkinter is guaranteed present on that path.
 """
 
-import tkinter as tk
+try:
+    import tkinter as tk
+except ModuleNotFoundError:  # headless / no-Tk install — GLOSSARY still importable
+    tk = None
 
 __all__ = ["Tooltip", "GLOSSARY"]
 
