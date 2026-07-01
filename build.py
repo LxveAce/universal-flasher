@@ -37,6 +37,10 @@ HIDDEN_IMPORTS = [
     "uf_core.backup",
     "uf_core.health",
     "uf_core.uihelp",
+    # Software-OS flashing (Kali/Tails/Arch to USB) — reached via conditional imports
+    # in gui_qt.app, so pull the module + its Qt tab in defensively for frozen builds.
+    "uf_core.os_catalog",
+    "gui_qt.software_tab",
     "serial",
     "serial.tools",
     "serial.tools.list_ports",
