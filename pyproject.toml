@@ -44,6 +44,7 @@ qt = ["PyQt5>=5.15"]
 tui = ["textual>=0.50"]
 web = ["flask>=3.0", "flask-socketio>=5.3"]
 all = ["PyQt5>=5.15", "textual>=0.50", "flask>=3.0", "flask-socketio>=5.3"]
+test = ["pytest>=7.0"]
 
 [project.urls]
 Homepage = "https://github.com/LxveAce/universal-flasher"
@@ -61,3 +62,7 @@ include = ["uf_core*", "gui*", "gui_qt*", "tui*", "web*", "suicide*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.svg", "*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,35 @@
+name: CI
+
+# Lightweight smoke checks so packaging/import regressions are caught on every push
+# and pull request (the release build only runs on publish). Compiles every module,
+# imports the core engine, and runs the hardware-free test suite.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install core + test deps
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Byte-compile every module
+        run: python -m compileall -q .
+
+      - name: Import the core engine
+        run: python -c "import uf_core; print('uf_core', uf_core.__version__)"
+
+      - name: Run the test suite
+        run: python -m pytest -q
