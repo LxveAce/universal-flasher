@@ -18,17 +18,15 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 - **Auto-updating OS catalog** — a weekly CI job keeps the bundled OS catalog current; latest versions auto-resolve, and everything works fully **offline** from a cached catalog and previously downloaded images.
 
 **In progress / known issues:**
-- Hardening the prebuilt standalone binaries so bundled ESP32 flashing works reliably out of the box (source/pip installs are unaffected).
-- Unifying version metadata across the package, build, and changelog so the UI reports a single consistent version.
+- A final on-hardware ESP32 flash test of the *prebuilt standalone binaries* is still pending (owner/hardware-gated). The frozen-binary flash path is fixed (multi-call esptool dispatch + bundled esptool data, v1.3.1) and source/pip installs are flash-verified — this is the last on-device confirmation of the packaged build.
 
 **Roadmap:**
 
-- Lightweight CI smoke checks (compile/import plus a packaged-binary check) to catch packaging regressions early.
-- Reconcile and maintain the CHANGELOG as part of version unification.
 - Continued responsible hardening of the web UI controls (download allowlist, redirect handling, path-traversal guard, WebSocket auth token).
 - In-app tooltips on every control and a thorough How-To / tutorial tab.
+- Flasher consolidation — share one canonical flash engine with cyber-controller (drop-a-JSON firmware growth).
 
-> **Scope:** Universal Flasher is strictly the flasher (Firmware + Software flashing) — no controller, logger, or wardriving. All-in-one control — combining flashing, logging, pentest tooling, lawful, owner-authorized wardriving (GPS-tagged Wi-Fi capture exported to WiGLE CSV), and an in-app Access-Gate setup (admin password / physical USB key, salted-scrypt + encrypted vault) — plus the main cyberdeck GUI ship in the separate flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)** project (latest release v1.2.1), not here.
+> **Scope:** Universal Flasher is strictly the flasher (Firmware + Software flashing) — no controller, logger, or wardriving. All-in-one control — combining flashing, logging, pentest tooling, lawful, owner-authorized wardriving (GPS-tagged Wi-Fi capture exported to WiGLE CSV), and an in-app Access-Gate setup (admin password / physical USB key, salted-scrypt + encrypted vault) — plus the main cyberdeck GUI ship in the separate flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)** project (latest release v1.5.0), not here.
 <!-- STATUS-ROADMAP:END -->
 
 ---

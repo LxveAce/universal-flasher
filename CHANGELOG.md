@@ -5,6 +5,12 @@
 > record development milestones that were folded into those tagged releases — they were never
 > cut as standalone git tags. Retro-tagging any of them is an owner decision.
 
+## [Unreleased]
+
+**Fixed:**
+- ESP32-C5 second-stage bootloader offset is `0x2000`, not `0x0` — writing the bootloader at 0x0 bricks a C5.
+- `send_and_capture` no longer loses output when the serial ring buffer fills during a long-running capture.
+
 ## [1.4.0] — 2026-06-27
 
 Software-OS flashing — flash whole operating systems to USB, alongside firmware.
