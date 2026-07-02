@@ -10,6 +10,11 @@
 **Fixed:**
 - ESP32-C5 second-stage bootloader offset is `0x2000`, not `0x0` — writing the bootloader at 0x0 bricks a C5.
 - `send_and_capture` no longer loses output when the serial ring buffer fills during a long-running capture.
+- `uf_core` now imports on headless / no-Tkinter installs — `uihelp` soft-imports tkinter instead of failing at import time.
+- Standalone (PyInstaller) binaries now include the Software-OS flow — `uf_core.os_catalog` and `gui_qt.software_tab` are declared as hidden imports so `--list-os` / `--flash-os` work in the frozen build.
+
+**Changed:**
+- `requirements.txt` realigned with `pyproject.toml`'s core+extras model (dropped the misplaced `nvs` pin, which lives in `suicide/host_requirements.txt`).
 
 ## [1.4.0] — 2026-06-27
 
