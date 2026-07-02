@@ -12,7 +12,7 @@ Line = Callable[[str], None]
 
 _UA = {"User-Agent": "universal-flasher"}
 
-# rate-limit cache: {api_url: (timestamp, (tag, release_notes, release_url))}
+# rate-limit cache: {api_url: (timestamp, {"tag", "release_notes", "release_url"})}
 _api_cache: Dict[str, tuple] = {}
 _cache_lock = threading.Lock()
 _CACHE_TTL = 300  # 5 minutes
