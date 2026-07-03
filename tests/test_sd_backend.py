@@ -67,6 +67,39 @@ def test_write_image_requires_confirmed(tmp_path):
         sd.write_image(str(img), r"\\.\PhysicalDrive9", _noline)  # confirmed defaults to False
 
 
+# ── _detect_sd_linux excludes the OS/boot disk (incl. a USB-attached root) ────
+class _FakeRun:
+    def __init__(self, stdout):
+        self.returncode = 0
+        self.stdout = stdout
+        self.stderr = ""
+
+
+def test_detect_sd_linux_skips_usb_root_disk(monkeypatch):
+    import json as _json
+    # sda: a USB-attached SSD hosting '/' and '/boot/firmware' (rm=0, tran=usb) — the classic Pi USB-boot
+    #      / live-USB case that the bus+removable heuristics alone would wave through. MUST be refused.
+    # sdb: a genuine USB SD-card reader, only an auto-mounted data partition — MUST still be offered.
+    lsblk = {
+        "blockdevices": [
+            {"name": "sda", "size": 240 * 10**9, "rm": False, "type": "disk", "tran": "usb",
+             "model": "USB-SSD", "mountpoint": None, "children": [
+                 {"name": "sda1", "type": "part", "mountpoint": "/boot/firmware"},
+                 {"name": "sda2", "type": "part", "mountpoint": "/"},
+             ]},
+            {"name": "sdb", "size": 16 * 10**9, "rm": True, "type": "disk", "tran": "usb",
+             "model": "CardReader", "mountpoint": None, "children": [
+                 {"name": "sdb1", "type": "part", "mountpoint": "/media/pi/DATA"},
+             ]},
+        ]
+    }
+    monkeypatch.setattr(sd.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(sd.subprocess, "run", lambda *a, **k: _FakeRun(_json.dumps(lsblk)))
+    devs = [c["device"] for c in sd._detect_sd_linux(_noline)]
+    assert "/dev/sda" not in devs   # the USB *root* disk is refused (before the fix it was offered)
+    assert "/dev/sdb" in devs       # a real removable card reader (only /media mount) is still offered
+
+
 # ── ctypes raw-disk HANDLE marshalling (64-bit safety) ────────────────────────
 def test_configure_kernel32_marshals_handle_without_overflow():
     import platform

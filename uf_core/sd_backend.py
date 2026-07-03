@@ -35,6 +35,14 @@ _CHUNK = 1 << 20
 # SD card sanity ceiling: refuse to write to anything >= 256 GB
 _MAX_SD_BYTES = 256 * (1 << 30)
 
+# Mountpoints that mark a disk as the running OS/boot disk. A disk hosting ANY of these (on itself or a
+# partition) is NEVER offered as a raw-write target, whatever bus it's on — increasingly the boot disk is
+# USB-attached (Raspberry Pi USB-SSD boot, live-USB installs), which the bus/removable heuristics alone
+# would otherwise wave through and let a raw image write destroy the running system.
+_PROTECTED_MOUNTS = frozenset((
+    "/", "/boot", "/boot/efi", "/boot/firmware", "/efi", "/usr", "/var", "/home",
+))
+
 # --------------------------------------------------------------------------- #
 # SSRF / download hardening (mirrors flasher.py approach, extended for Pi hosts)
 # --------------------------------------------------------------------------- #
@@ -365,12 +373,27 @@ def _detect_sd_windows(on_line: Line) -> List[Dict]:
     return cards
 
 
+def _subtree_mountpoints(node: Dict) -> List[str]:
+    """All mountpoints on a lsblk node and its descendants (partitions). Handles both the legacy
+    ``mountpoint`` (string) and the newer ``mountpoints`` (list) lsblk fields."""
+    mps: List[str] = []
+    mp = node.get("mountpoint")
+    if mp:
+        mps.append(mp)
+    for m in node.get("mountpoints") or []:
+        if m:
+            mps.append(m)
+    for child in node.get("children") or []:
+        mps.extend(_subtree_mountpoints(child))
+    return mps
+
+
 def _detect_sd_linux(on_line: Line) -> List[Dict]:
     """List removable block devices on Linux via lsblk."""
     cards: List[Dict] = []
     try:
         r = subprocess.run(
-            ["lsblk", "-J", "-b", "-o", "NAME,SIZE,RM,TYPE,TRAN,MODEL"],
+            ["lsblk", "-J", "-b", "-o", "NAME,SIZE,RM,TYPE,TRAN,MODEL,MOUNTPOINT"],
             capture_output=True, text=True, timeout=10,
         )
         if r.returncode != 0:
@@ -379,6 +402,14 @@ def _detect_sd_linux(on_line: Line) -> List[Dict]:
         data = json.loads(r.stdout)
         for dev in data.get("blockdevices", []):
             if dev.get("type") != "disk":
+                continue
+            # NEVER offer the OS/boot disk, whatever bus it's on — a USB-attached root/boot disk (Pi
+            # USB-SSD boot, live-USB) is fixed=False + tran=usb and would otherwise pass the heuristics
+            # below and let a raw write destroy the running system. (Parity with the Windows IsSystem/
+            # IsBoot check.) Keyed off a real system mount anywhere in the disk's partition subtree.
+            sys_mounts = [m for m in _subtree_mountpoints(dev) if m in _PROTECTED_MOUNTS]
+            if sys_mounts:
+                on_line(f"[sd] skipping /dev/{dev.get('name')} — hosts a system mount ({sys_mounts[0]})")
                 continue
             rm = dev.get("rm")
             # rm can be bool, int, or string "1"/"0"/"true"/"false" depending on lsblk version
