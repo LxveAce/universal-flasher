@@ -77,3 +77,11 @@ def test_flash_detect_rejected_while_busy(monkeypatch):
     assert app_mod._flash_busy is True                  # left the in-progress flash's claim intact
     assert any("in progress" in str(a) for a in events)
     _reset()
+
+
+# ── the non-localhost bind is flagged so the operator consents to LAN exposure ──
+def test_is_public_bind_flags_only_non_loopback():
+    for loopback in ("127.0.0.1", "localhost", "::1", "", "  LOCALHOST  "):
+        assert app_mod._is_public_bind(loopback) is False
+    for public in ("0.0.0.0", "192.168.1.5", "10.0.0.2", "example.local", "::"):
+        assert app_mod._is_public_bind(public) is True

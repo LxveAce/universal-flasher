@@ -41,6 +41,18 @@ _flash_lock = threading.Lock()
 
 # ── helpers ─────────────────────────────────────────────────────────────── #
 
+# Hosts that keep the UI on this machine only. Binding anywhere else serves the flasher — which can
+# flash/ERASE the connected board and read local files chosen as a firmware source — to other hosts,
+# and the access token is rendered into the page for anyone who can load it, so the operator must be
+# warned explicitly before exposing it (there is no per-user login).
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", ""})
+
+
+def _is_public_bind(host: str) -> bool:
+    """True if `host` exposes the UI beyond this machine (0.0.0.0, a LAN IP, or a hostname)."""
+    return (host or "").strip().lower() not in _LOOPBACK_HOSTS
+
+
 def _on_line(line: str):
     global _snapshot_counter
     parser.feed(line)
@@ -551,6 +563,13 @@ def main():
     print(f"\n  Universal Flasher v{__version__} — Browser UI")
     print(f"  Open http://{args.host}:{args.web_port} in your browser")
     print(f"  Auth token: {_AUTH_TOKEN}\n")
+
+    if _is_public_bind(args.host):
+        print(f"  [!] SECURITY WARNING: --host {args.host} exposes this flasher beyond this machine.")
+        print("      Anyone who can reach this URL can flash or ERASE the connected board and read")
+        print("      local files you select as firmware — there is no per-user login, and the access")
+        print("      token is served to whoever loads the page. Only do this on a trusted network;")
+        print("      use the default --host 127.0.0.1 to stay local-only.\n")
 
     origin = f"http://{args.host}:{args.web_port}"
     socketio.cors_allowed_origins = [origin, f"http://127.0.0.1:{args.web_port}", f"http://localhost:{args.web_port}"]
