@@ -49,6 +49,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -226,12 +227,14 @@ def esptool_available() -> bool:
         return False
 
 
-def _run_stream(argv: List[str], on_line: Line) -> int:
+def _run_stream(argv: List[str], on_line: Line, timeout: Optional[float] = None) -> int:
     """Run a command, stream combined stdout/stderr line-by-line, return exit code.
 
-    On any exception mid-stream (e.g. the UI callback raises because a dialog closed), the
-    child is killed and reaped so it can't keep holding the serial port — otherwise the next
-    flash fails with 'port busy'.
+    The child is ALWAYS killed and reaped if it's still alive when we leave — whether a UI callback
+    raised (Exception), a KeyboardInterrupt/BaseException unwound past the handler, or an optional
+    `timeout` watchdog fired — so it can't keep holding the serial port (the next flash would fail with
+    'port busy'). `timeout` (seconds) bounds a call that might otherwise wedge, e.g. chip detection on a
+    silent port; leave it None for the flash paths so their behavior is unchanged.
     """
     on_line("$ " + " ".join(argv))
     try:
@@ -240,19 +243,39 @@ def _run_stream(argv: List[str], on_line: Line) -> int:
     except FileNotFoundError as e:
         on_line(f"[error] {e}")
         return 127
+
+    timer: Optional[threading.Timer] = None
+    if timeout is not None:
+        def _kill_on_timeout() -> None:
+            if proc.poll() is None:
+                on_line(f"[error] timed out after {timeout:.0f}s — killing the process")
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        timer = threading.Timer(timeout, _kill_on_timeout)
+        timer.daemon = True
+        timer.start()
+
     try:
         for line in proc.stdout:                   # type: ignore[union-attr]
             on_line(line.rstrip("\n"))
         proc.wait()
     except Exception as e:
         on_line(f"[error] {e}")
-        try:
-            proc.kill()
-            proc.wait(timeout=5)
-        except Exception:
-            pass
         return -1
     finally:
+        if timer is not None:
+            timer.cancel()
+        # Guard on poll(): the normal path already reaped via wait(), so this is a no-op there; it only
+        # fires when the child is still alive (mid-stream Exception, BaseException/Ctrl-C, or a timeout
+        # kill that hasn't been reaped yet).
+        if proc.poll() is None:
+            try:
+                proc.kill()
+                proc.wait(timeout=5)
+            except Exception:
+                pass
         try:
             if proc.stdout:
                 proc.stdout.close()
@@ -272,7 +295,9 @@ def _detect_chip(port: str, on_line: Line) -> Optional[str]:
         out_lines.append(s)
         on_line(s)
 
-    _run_stream(argv, cap)
+    # Bound the probe: esptool chip_id normally connects in a few seconds, but a USB-serial device
+    # with no ESP ROM responding (or auto-reset not wired) can leave it waiting — don't hang the caller.
+    _run_stream(argv, cap, timeout=30)
     text = "\n".join(out_lines)
     for token, chip in (("ESP32-S3", "esp32s3"), ("ESP32-S2", "esp32s2"),
                         ("ESP32-C6", "esp32c6"), ("ESP32-C5", "esp32c5"),
@@ -1243,6 +1268,12 @@ class CytNgProfile(FirmwareProfile):
 _MOMENTUM_API = "https://api.github.com/repos/Next-Flip/Momentum-Firmware/releases/latest"
 
 
+# Distinct non-success sentinel for a hand-off to qFlipper: the GUI was launched but this tool cannot
+# confirm the firmware actually installed. NOT 0 (never report an unverified success) and NOT esptool's
+# usual failure codes — it means "unconfirmed, verify manually".
+_QFLIPPER_UNVERIFIED = 3
+
+
 class MomentumProfile(FirmwareProfile):
     id = "momentum"
     label = "Flipper Momentum (Next-Flip)"
@@ -1302,7 +1333,15 @@ class MomentumProfile(FirmwareProfile):
             on_line("[info] Open qFlipper manually and install from file.")
             return 1
         on_line(f"[info] Found qFlipper at: {qflipper}")
-        return _run_stream([qflipper, "--install", app_path], on_line)
+        rc = _run_stream([qflipper, "--install", app_path], on_line)
+        if rc != 0:
+            on_line(f"[error] qFlipper exited with code {rc}")
+            return rc
+        # qFlipper is a GUI: a 0 exit means the app launched/closed, NOT that the firmware installed.
+        # Never report that as a flash success — tell the user to confirm and return the unverified sentinel.
+        on_line("[warn] qFlipper was launched but this tool cannot confirm the flash result.")
+        on_line("[warn] Verify in qFlipper that the firmware finished installing before disconnecting.")
+        return _QFLIPPER_UNVERIFIED
 
 
 # --------------------------------------------------------------------------- #
