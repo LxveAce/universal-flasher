@@ -437,6 +437,40 @@ def _detect_sd_linux(on_line: Line) -> List[Dict]:
     return cards
 
 
+def _whole_disk_id(device_ident: str) -> str:
+    """'disk0s2' / 'disk0s2s1' -> 'disk0'; 'disk0' -> 'disk0' (macOS whole-disk id of a slice)."""
+    m = re.match(r"^(disk\d+)", device_ident or "")
+    return m.group(1) if m else (device_ident or "")
+
+
+def _macos_boot_whole_disks(on_line: Line) -> set:
+    """PHYSICAL whole-disk ids backing '/', so an external boot/system disk is NEVER offered as an SD
+    write target (parity with the Windows IsSystem/IsBoot and Linux system-mount guards). Best-effort:
+    resolves both the direct ParentWholeDisk and, for APFS, the container's physical stores. Returns an
+    empty set on any failure so detection degrades to the prior behavior rather than crashing."""
+    protected: set = set()
+    try:
+        import plistlib
+        r = subprocess.run(["diskutil", "info", "-plist", "/"],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode != 0 or not r.stdout:
+            return protected
+        info = plistlib.loads(r.stdout.encode("utf-8"))
+    except Exception as e:
+        on_line(f"[sd] could not resolve the boot disk (continuing): {e}")
+        return protected
+    pwd = info.get("ParentWholeDisk")
+    if pwd:
+        protected.add(_whole_disk_id(pwd))
+    # APFS: '/' lives on a synthesized container whose ParentWholeDisk is NOT the physical disk, so also
+    # map each backing physical store to its whole disk (this is what catches an external APFS boot SSD).
+    for store in info.get("APFSPhysicalStores") or []:
+        did = store.get("DeviceIdentifier") or store.get("APFSPhysicalStore")
+        if did:
+            protected.add(_whole_disk_id(did))
+    return protected
+
+
 def _detect_sd_macos(on_line: Line) -> List[Dict]:
     """List removable disk devices on macOS via diskutil."""
     cards: List[Dict] = []
@@ -452,7 +486,13 @@ def _detect_sd_macos(on_line: Line) -> List[Dict]:
         import plistlib
         plist = plistlib.loads(r.stdout.encode("utf-8"))
         whole_disks = plist.get("WholeDisks", [])
+        boot_disks = _macos_boot_whole_disks(on_line)
         for disk_id in whole_disks:
+            # NEVER offer the boot/system disk, even when it's an external USB/Thunderbolt SSD — a raw
+            # image write there would destroy the running OS.
+            if _whole_disk_id(disk_id) in boot_disks:
+                on_line(f"[sd] skipping /dev/{disk_id} — it backs the running system (/)")
+                continue
             dev = f"/dev/{disk_id}"
             # get size via diskutil info
             info_r = subprocess.run(

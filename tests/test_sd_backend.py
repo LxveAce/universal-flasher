@@ -100,6 +100,36 @@ def test_detect_sd_linux_skips_usb_root_disk(monkeypatch):
     assert "/dev/sdb" in devs       # a real removable card reader (only /media mount) is still offered
 
 
+# ── _detect_sd_macos excludes an external boot/system disk ────────────────────
+def test_detect_sd_macos_skips_external_boot_disk(monkeypatch):
+    import plistlib
+
+    def _pl(d):
+        return plistlib.dumps(d).decode()
+
+    # '/' is on an APFS volume whose container's physical store is disk2 → disk2 is the boot disk.
+    root_info = {"ParentWholeDisk": "disk9", "APFSPhysicalStores": [{"DeviceIdentifier": "disk2s2"}]}
+    list_ext = {"WholeDisks": ["disk2", "disk4"]}
+    disk2 = {"TotalSize": 240 * 10**9, "Removable": False, "Internal": False,
+             "MediaName": "External Boot SSD", "BusProtocol": "USB"}       # external BUT is the boot disk
+    disk4 = {"TotalSize": 32 * 10**9, "Removable": True, "Internal": False,
+             "MediaName": "SD Card", "BusProtocol": "USB"}                 # a genuine external SD card
+
+    def fake_run(cmd, **k):
+        if cmd[:3] == ["diskutil", "list", "-plist"]:
+            return _FakeRun(_pl(list_ext))
+        if cmd[:3] == ["diskutil", "info", "-plist"]:
+            info = {"/": root_info, "disk2": disk2, "disk4": disk4}.get(cmd[3], {})
+            return _FakeRun(_pl(info))
+        return _FakeRun("")
+
+    monkeypatch.setattr(sd.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(sd.subprocess, "run", fake_run)
+    devs = [c["device"] for c in sd._detect_sd_macos(_noline)]
+    assert "/dev/disk2" not in devs   # the external *boot* disk is refused (before the fix it was offered)
+    assert "/dev/disk4" in devs       # a genuine external SD card is still offered
+
+
 # ── ctypes raw-disk HANDLE marshalling (64-bit safety) ────────────────────────
 def test_configure_kernel32_marshals_handle_without_overflow():
     import platform
