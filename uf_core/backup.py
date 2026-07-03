@@ -99,6 +99,16 @@ def backup_flash(port: str, on_line: Line, chip: Optional[str] = None,
 
     if rc != 0:
         on_line(f"[error] Backup failed (exit code {rc})")
+        # esptool may have written a partial dump before failing. Remove it: the .meta (with the sha) is
+        # only written on success, so a stray .bin left here is always incomplete — and list_backups lists
+        # any .bin regardless of its .meta, so a lingering truncated dump would resurface as a restorable
+        # "backup" and, if restored, flash a short image (the exact silent-truncation disaster this module
+        # refuses to guess its way into).
+        if os.path.isfile(dest):
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
         return None
 
     if os.path.isfile(dest):

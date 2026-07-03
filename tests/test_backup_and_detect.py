@@ -76,6 +76,28 @@ def test_backup_uses_detected_size_not_default(tmp_path, monkeypatch):
     assert "flash_size=0x1000000" in meta  # 16MB, the detected size — not 0x400000
 
 
+def test_backup_removes_partial_dump_on_read_failure(tmp_path, monkeypatch):
+    """read_flash fails AFTER esptool already wrote a partial file → the truncated .bin must be removed,
+    never left to resurface in list_backups as a restorable (short) backup (which would flash a stub)."""
+    state = {"n": 0}
+
+    def fake_run_stream(argv, on_line):
+        state["n"] += 1
+        if state["n"] == 1:
+            on_line("Detected flash size: 4MB")
+            return 0
+        dest = argv[-1]                       # read_flash writes a partial dump...
+        with open(dest, "wb") as f:
+            f.write(b"\x00" * 1024)
+        return 1                              # ...then fails
+
+    monkeypatch.setattr(backup, "_run_stream", fake_run_stream)
+    lines = []
+    out = backup.backup_flash("COM9", lines.append, chip="esp32", output_dir=str(tmp_path))
+    assert out is None
+    assert list(tmp_path.glob("*.bin")) == []   # the partial dump was cleaned up, not left behind
+
+
 # ── device_detect.py: the idle read has an absolute ceiling ────────────────
 class _ChattyPort:
     """A fake serial port that ALWAYS has bytes waiting — simulates a device streaming continuously."""
