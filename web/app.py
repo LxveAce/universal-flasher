@@ -36,8 +36,10 @@ _autolist_timer = None
 _autolist_active = False
 _snapshot_counter = 0
 # Guards a single esptool operation at a time: detect/flash/suicide/erase all share the serial
-# port, and two concurrent esptool runs would collide on the port. Set/cleared by the worker.
+# port, and two concurrent esptool runs would collide on the port. Claimed/released atomically via
+# _acquire_flash/_release_flash (below) so two tabs can't both pass a check-then-set race.
 _flash_busy = False
+_flash_lock = threading.Lock()
 
 # ── helpers ─────────────────────────────────────────────────────────────── #
 
@@ -260,26 +262,42 @@ def _free_serial():
         ctrl.disconnect()
 
 
+def _acquire_flash() -> bool:
+    """Atomically claim the shared serial port for one esptool op. False if already claimed.
+
+    A plain `if _flash_busy: ... ; _flash_busy = True` is a check-then-set race — two tabs firing
+    at once can both read False and both proceed onto the same port. The lock makes it atomic."""
+    global _flash_busy
+    with _flash_lock:
+        if _flash_busy:
+            return False
+        _flash_busy = True
+        return True
+
+
+def _release_flash():
+    global _flash_busy
+    with _flash_lock:
+        _flash_busy = False
+
+
 def _run_flash_task(fn):
     """Run a blocking flasher job in a background task under the busy flag.
 
     Rejects a second concurrent flash (the shared serial port can only be driven by one
     esptool at a time). Always clears the busy flag and emits the done/rc terminator."""
-    global _flash_busy
-    if _flash_busy:
+    if not _acquire_flash():
         socketio.emit("flash_status", {"error": "A flash/erase is already in progress."})
         return
-    _flash_busy = True
 
     def runner():
-        global _flash_busy
         rc = -1
         try:
             rc = fn()
         except Exception as e:
             _flash_line(f"[error] {e}")
         finally:
-            _flash_busy = False
+            _release_flash()
             socketio.emit("flash_status", {"done": True, "rc": rc})
 
     socketio.start_background_task(runner)
@@ -291,14 +309,20 @@ def on_flash_detect(data):
     if not port:
         emit("flash_status", {"error": "No port specified"})
         return
-    if _flash_busy:
+    # Detect drives esptool on the shared port too, so it must claim the busy flag like every other
+    # esptool entrypoint — otherwise a detect and a flash (or two detects) collide on the port and
+    # fail "port busy". And free the live serial session first so esptool can own the port.
+    if not _acquire_flash():
         emit("flash_status", {"error": "Cannot detect chip while a flash/erase is in progress."})
         return
     try:
+        _free_serial()
         chip = flasher.detect_chip(port, _flash_line)
         emit("flash_status", {"chip": chip})
     except Exception as e:
         emit("flash_status", {"error": str(e)})
+    finally:
+        _release_flash()
 
 
 @socketio.on("flash_releases")
