@@ -17,6 +17,7 @@ Key facts (RayHunter on Orbic RC400L):
   * A deactivated SIM must be inserted for the device to boot its radio stack.
 """
 
+import ipaddress
 import json
 import os
 import platform
@@ -499,6 +500,18 @@ def install_rayhunter(on_line: Line, serial: Optional[str] = None,
 
     Returns 0 on success, non-zero on failure.
     """
+    # Defense-in-depth: in the network method admin_ip is placed on the installer's `--admin-ip`
+    # argument (the box the EFF installer talks to), so require a bare IPv4/IPv6 literal and reject a
+    # hostname/URL/garbage up front — before any network or ADB work — so a mistyped or hostile value
+    # can't be handed to the installer or turned into an SSRF target. (Parity with the cyber-controller
+    # sibling's admin_ip validation; the usb method ignores admin_ip, so it's only checked here.)
+    if method != "usb":
+        try:
+            ipaddress.ip_address(admin_ip)
+        except ValueError:
+            on_line(f"[error] invalid admin_ip {admin_ip!r} -- expected an IPv4 or IPv6 address")
+            return 1
+
     profile = ADB_PROFILES["rayhunter"]
     on_line(f"[rayhunter] fetching latest release from {profile['repo']}...")
 

@@ -88,3 +88,44 @@ def test_install_manual_succeeds_when_all_steps_ok(tmp_path, monkeypatch):
     monkeypatch.setattr(adb, "adb_shell", fake_shell)
     rc = adb.install_manual(_daemon(tmp_path), lambda _s: None)
     assert rc == 0
+
+
+# ── B-4: install_rayhunter validates admin_ip before any network/adb work ──
+# admin_ip is placed on the EFF installer's `--admin-ip` arg (the box it talks to), so a non-IP
+# (hostname/URL/garbage) must be rejected up front — never handed to the installer. Parity with the
+# cyber-controller sibling. If validation regresses, these would reach the network; the _github_latest
+# stub turns that into a hard failure instead of a slow/flaky real fetch.
+def _fail_if_network(*_a, **_k):
+    raise AssertionError("network reached before admin_ip was validated")
+
+
+def test_install_rayhunter_rejects_non_ip_admin_ip(monkeypatch):
+    monkeypatch.setattr(adb, "_github_latest", _fail_if_network)
+    lines = []
+    rc = adb.install_rayhunter(lines.append, admin_ip="evil.example.com")
+    assert rc == 1
+    assert any("invalid admin_ip" in l for l in lines)
+
+
+def test_install_rayhunter_rejects_url_admin_ip(monkeypatch):
+    monkeypatch.setattr(adb, "_github_latest", _fail_if_network)
+    lines = []
+    rc = adb.install_rayhunter(lines.append, admin_ip="http://169.254.169.254/")
+    assert rc == 1
+    assert any("invalid admin_ip" in l for l in lines)
+
+
+def test_install_rayhunter_accepts_valid_ip_and_usb_skips_check(monkeypatch):
+    # A valid IP passes validation; the usb method never uses admin_ip, so even a non-IP must NOT be
+    # rejected on that path. In both cases we stop right after by failing the release fetch, and assert
+    # the "invalid admin_ip" rejection did NOT fire.
+    def _stop(*_a, **_k):
+        raise RuntimeError("stop-after-validation")
+
+    monkeypatch.setattr(adb, "_github_latest", _stop)
+    for kwargs in ({"admin_ip": "10.0.0.5"}, {"admin_ip": "not-an-ip", "method": "usb"}):
+        lines = []
+        rc = adb.install_rayhunter(lines.append, **kwargs)
+        assert rc == 1  # from the forced release-fetch failure, not from admin_ip validation
+        assert not any("invalid admin_ip" in l for l in lines)
+        assert any("failed to fetch release info" in l for l in lines)
