@@ -13,7 +13,6 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 try:
     import serial
-    from serial.tools import list_ports
     _HAVE_PYSERIAL = True
 except Exception:
     _HAVE_PYSERIAL = False

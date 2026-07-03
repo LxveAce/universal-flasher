@@ -9,7 +9,7 @@ import os
 import time
 from typing import Callable, Optional
 
-from .flasher import esptool_argv, _run_stream, _detect_chip, _BOOTLOADER_0
+from .flasher import esptool_argv, _run_stream, _detect_chip
 
 Line = Callable[[str], None]
 

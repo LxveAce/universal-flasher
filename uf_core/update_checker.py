@@ -5,7 +5,7 @@ import threading
 import time
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
 
 Line = Callable[[str], None]

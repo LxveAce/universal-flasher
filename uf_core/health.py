@@ -7,7 +7,7 @@ the firmware started successfully by checking for known startup signatures.
 import re
 import time
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List
 
 Line = Callable[[str], None]
 
