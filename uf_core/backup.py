@@ -59,17 +59,33 @@ def backup_flash(port: str, on_line: Line, chip: Optional[str] = None,
             size_lines.append(s)
             on_line(s)
 
-        _run_stream(size_argv, cap)
-        detected_size = "0x400000"
+        # A backup is a recovery artifact, so a WRONG size is worse than no backup: read_flash of an
+        # assumed 4MB on a real 16MB board returns rc 0 and silently drops 12MB (partitions/nvs/SPIFFS/
+        # OTA) while reporting success — the truncation only surfaces later, when a restore can't recover
+        # the board. So refuse to guess: abort on a failed flash_id, an unrecognized size, or no size line.
+        size_rc = _run_stream(size_argv, cap)
+        if size_rc != 0:
+            on_line(f"[error] flash-size detection failed (exit code {size_rc}) — refusing to guess a size "
+                    "and write a possibly-truncated backup. Retry, or pass an explicit flash_size.")
+            return None
+        size_map = {
+            "1MB": "0x100000", "2MB": "0x200000", "4MB": "0x400000",
+            "8MB": "0x800000", "16MB": "0x1000000", "32MB": "0x2000000",
+        }
+        detected_size = None
         for line in size_lines:
             if "Detected flash size:" in line:
                 size_str = line.split(":")[-1].strip()
-                size_map = {
-                    "1MB": "0x100000", "2MB": "0x200000", "4MB": "0x400000",
-                    "8MB": "0x800000", "16MB": "0x1000000", "32MB": "0x2000000",
-                }
-                detected_size = size_map.get(size_str, "0x400000")
+                detected_size = size_map.get(size_str)
+                if detected_size is None:
+                    on_line(f"[error] esptool reported an unrecognized flash size {size_str!r} — refusing "
+                            "to guess. Pass an explicit flash_size to back this board up.")
+                    return None
                 break
+        if detected_size is None:
+            on_line("[error] could not read the flash size from esptool output — refusing to guess a size "
+                    "and write a possibly-truncated backup. Pass an explicit flash_size.")
+            return None
         flash_size = detected_size
 
     on_line(f"[backup] Reading {flash_size} bytes from {port} ({chip})...")

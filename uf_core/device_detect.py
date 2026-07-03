@@ -128,11 +128,21 @@ def detect_chip_from_text(text: str) -> Optional[str]:
 
 # ── serial probe ────────────────────────────────────────────────────────── #
 
-def _read_until_idle(ser: serial.Serial, timeout: float) -> str:
-    """Read from serial until no new data arrives for `timeout` seconds."""
+def _read_until_idle(ser: serial.Serial, timeout: float, max_total: float = 3.0) -> str:
+    """Read from serial until no new data arrives for `timeout` seconds, OR `max_total` seconds elapse
+    overall — whichever comes first.
+
+    The absolute `max_total` cap is what makes this safe against a device that streams continuously — a
+    GPS/u-blox emitting NMEA, or a board stuck in a boot-loop spewing its log. Without it the idle
+    `deadline` is pushed forward on every read, so the loop (and with it probe_firmware → scan_ports →
+    the whole scan thread) would never return.
+    """
     buf = b""
-    deadline = time.monotonic() + timeout
+    start = time.monotonic()
+    deadline = start + timeout
     while time.monotonic() < deadline:
+        if time.monotonic() - start >= max_total:
+            break
         waiting = ser.in_waiting
         if waiting:
             buf += ser.read(waiting)
