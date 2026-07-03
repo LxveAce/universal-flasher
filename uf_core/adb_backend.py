@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -152,34 +153,51 @@ def _run_adb(args: List[str], on_line: Line, timeout: int = 120) -> Tuple[int, s
         on_line(f"[error] {e}")
         return 127, ""
     lines: List[str] = []
+
+    # A wall-clock watchdog. The streaming read below (`for line in proc.stdout`) blocks with no bound of
+    # its own, and the old `proc.wait(timeout=)` was only reached AFTER stdout hit EOF — so an adb command
+    # that emits nothing and never exits (`wait-for-device` with no device attached) would hang forever and
+    # the timeout was dead. Killing the child on expiry closes the pipe, which unblocks the read.
+    timed_out = {"v": False}
+
+    def _kill_on_timeout() -> None:
+        if proc.poll() is None:
+            timed_out["v"] = True
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    timer = threading.Timer(timeout, _kill_on_timeout)
+    timer.daemon = True
+    timer.start()
     try:
         for line in proc.stdout:  # type: ignore[union-attr]
             stripped = line.rstrip("\n")
             lines.append(stripped)
             on_line(stripped)
-        proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        on_line("[error] adb command timed out")
-        try:
-            proc.kill()
-            proc.wait(timeout=5)
-        except Exception:
-            pass
-        return -1, "\n".join(lines)
+        proc.wait()
     except Exception as e:
         on_line(f"[error] {e}")
-        try:
-            proc.kill()
-            proc.wait(timeout=5)
-        except Exception:
-            pass
         return -1, "\n".join(lines)
     finally:
+        timer.cancel()
+        # Reap the child if it's still alive (watchdog kill in flight, or a mid-stream exception) so it
+        # can't linger. poll() keeps the normal path — already reaped by wait() — a no-op.
+        if proc.poll() is None:
+            try:
+                proc.kill()
+                proc.wait(timeout=5)
+            except Exception:
+                pass
         try:
             if proc.stdout:
                 proc.stdout.close()
         except Exception:
             pass
+    if timed_out["v"]:
+        on_line(f"[error] adb command timed out after {timeout}s")
+        return -1, "\n".join(lines)
     on_line(f"[exit {proc.returncode}]")
     return proc.returncode, "\n".join(lines)
 
@@ -666,18 +684,27 @@ def install_manual(daemon_binary_path: str, on_line: Line,
         on_line("[error] failed to push daemon binary")
         return rc
 
-    adb_shell(f"chmod 755 {_DEVICE_DAEMON}", on_line, serial=serial)
+    rc, _ = adb_shell(f"chmod 755 {_DEVICE_DAEMON}", on_line, serial=serial)
+    if rc != 0:
+        on_line("[error] failed to make the daemon binary executable")
+        return rc
 
     # push config (only if not already present)
     rc, output = adb_shell(f"test -f {_DEVICE_CONFIG} && echo EXISTS || echo MISSING",
                            on_line, serial=serial)
     if "MISSING" in output:
         on_line("[rayhunter] pushing default config...")
-        config_tmp = os.path.join(tempfile.gettempdir(), "rayhunter_config.toml")
+        # mkstemp gives an unpredictable, exclusively-created (mode 0600) path. Never open a fixed name in
+        # the world-writable temp dir with "w" — that follows a pre-planted symlink (TOCTOU/symlink clobber)
+        # and could hand attacker-controlled content to the device's /etc/init.d.
+        fd, config_tmp = tempfile.mkstemp(prefix="rayhunter_config_", suffix=".toml")
         try:
-            with open(config_tmp, "w", encoding="utf-8") as f:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(_DEFAULT_CONFIG)
-            adb_push(config_tmp, _DEVICE_CONFIG, on_line, serial=serial)
+            rc = adb_push(config_tmp, _DEVICE_CONFIG, on_line, serial=serial)
+            if rc != 0:
+                on_line("[error] failed to push default config")
+                return rc
         finally:
             try:
                 os.unlink(config_tmp)
@@ -688,18 +715,24 @@ def install_manual(daemon_binary_path: str, on_line: Line,
 
     # push init script
     on_line("[rayhunter] pushing init script...")
-    init_tmp = os.path.join(tempfile.gettempdir(), "rayhunter_daemon_init")
+    fd, init_tmp = tempfile.mkstemp(prefix="rayhunter_daemon_init_")
     try:
-        with open(init_tmp, "w", encoding="utf-8", newline="\n") as f:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(_INIT_SCRIPT)
-        adb_push(init_tmp, _DEVICE_INIT, on_line, serial=serial)
+        rc = adb_push(init_tmp, _DEVICE_INIT, on_line, serial=serial)
+        if rc != 0:
+            on_line("[error] failed to push init script")
+            return rc
     finally:
         try:
             os.unlink(init_tmp)
         except OSError:
             pass
 
-    adb_shell(f"chmod 755 {_DEVICE_INIT}", on_line, serial=serial)
+    rc, _ = adb_shell(f"chmod 755 {_DEVICE_INIT}", on_line, serial=serial)
+    if rc != 0:
+        on_line("[error] failed to make the init script executable")
+        return rc
 
     on_line("[rayhunter] manual install complete. Reboot the device to start RayHunter.")
     return 0
