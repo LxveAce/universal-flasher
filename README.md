@@ -100,7 +100,7 @@ Drop a `.json` profile into `~/.universal-flasher/plugins/` (or `%LOCALAPPDATA%\
 }
 ```
 
-`flash_method` accepts `esptool`, `qflipper`, `dfu`, or `uf2`; `image_model` is `merged` or `multi`. The required fields are `id`, `label`, `repo`, `flash_method`, and `supported_chips`.
+`flash_method` currently must be `esptool` (qflipper/dfu/uf2 plugin dispatch isn't wired yet — a plugin declaring them is rejected with a clear message rather than silently flashed with esptool); `image_model` is `merged` or `multi`. The required fields are `id`, `label`, `repo`, `flash_method`, and `supported_chips`.
 
 ## Four Native UIs
 

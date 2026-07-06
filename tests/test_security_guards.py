@@ -7,6 +7,7 @@ dispatch. No hardware, network, or serial device is touched.
 
 from __future__ import annotations
 
+import json
 import sys
 
 import pytest
@@ -215,3 +216,26 @@ class TestValidatePlugin:
         data["baud"] = 0
         with pytest.raises(ValueError, match="baud"):
             plugins._validate_plugin(data)
+
+    @pytest.mark.parametrize("method", ["qflipper", "dfu", "uf2"])
+    def test_rejects_unwired_flash_methods(self, method):
+        # PluginProfile only dispatches esptool today; accepting these would silently flash with the wrong tool.
+        data = _valid_plugin()
+        data["flash_method"] = method
+        with pytest.raises(ValueError, match="flash_method"):
+            plugins._validate_plugin(data)
+
+
+class TestRegisterPlugins:
+    def test_dropped_in_plugin_appears_in_registry(self, tmp_path, monkeypatch):
+        # A valid plugin JSON dropped into the plugin dir must be wired into the profile registry
+        # (regression guard: register_plugins() is now called at uf_core import; without it the feature is inert).
+        pdir = tmp_path / "plugins"
+        pdir.mkdir()
+        (pdir / "myfw.json").write_text(json.dumps(_valid_plugin()), encoding="utf-8")
+        monkeypatch.setattr(plugins, "plugin_dir", lambda: str(pdir))
+        registry: dict = {}
+        registered = plugins.register_plugins(registry)
+        assert "myfw" in registered
+        assert "myfw" in registry
+        assert registry["myfw"].label == "My Firmware"

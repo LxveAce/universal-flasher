@@ -53,8 +53,13 @@ def _validate_plugin(data: Any, source: str = "<unknown>") -> Dict[str, Any]:
         raise ValueError(f"{source}: 'repo' must be 'owner/name' format (got {repo!r})")
 
     method = data["flash_method"]
-    if method not in ("esptool", "qflipper", "dfu", "uf2"):
-        raise ValueError(f"{source}: 'flash_method' must be one of esptool/qflipper/dfu/uf2 (got {method!r})")
+    # Only esptool is actually dispatched by PluginProfile.flash_assets today; accepting qflipper/dfu/uf2
+    # here would silently flash those targets with esptool (a guaranteed bad/corrupt flash), so reject them
+    # with a clear message until the non-esptool dispatch is implemented.
+    if method != "esptool":
+        if method in ("qflipper", "dfu", "uf2"):
+            raise ValueError(f"{source}: 'flash_method' {method!r} is not supported yet — only 'esptool' plugins can flash today")
+        raise ValueError(f"{source}: 'flash_method' must be 'esptool' (got {method!r})")
 
     chips = data["supported_chips"]
     if not isinstance(chips, list) or not chips:

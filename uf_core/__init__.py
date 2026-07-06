@@ -12,10 +12,20 @@ from . import commands
 from . import flasher
 from . import updater
 from . import device_detect
+from . import plugins
+
+# Wire community plugins into the profile registry at import, so every UI (PyQt/GTK/TUI/web) picks up drop-in
+# JSON firmware profiles from ~/.universal-flasher/plugins/. Without this the documented plugin feature is inert
+# (the UIs only ever read the built-in flasher.PROFILES). Never let a bad plugin dir break startup — malformed
+# plugins are skipped by load_plugins(); a UI can surface details via plugins.load_plugins_with_errors().
+try:
+    plugins.register_plugins(flasher.PROFILES)
+except Exception:
+    pass
 
 __all__ = [
     "MarauderController", "MarauderParser", "AP", "Station",
     "CaptureLogger", "default_log_dir",
     "DeviceInfo", "scan_ports", "generate_manifest",
-    "commands", "flasher", "updater", "device_detect", "__version__",
+    "commands", "flasher", "updater", "device_detect", "plugins", "__version__",
 ]
