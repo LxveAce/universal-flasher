@@ -4,6 +4,8 @@
 
 Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero, and ADB-based security hardware. One app flashes, controls, and manages every device in your cyberdeck, or any standalone security build.
 
+> **⚡ Hardware in the works** — [LxveLabs](https://github.com/LxveAce) is developing a custom security-hardware board **in collaboration with [PCBWay](https://www.pcbway.com)**.
+
 **Built on the [Headless Marauder GUI](https://github.com/LxveAce/headless-marauder-gui) scaffold.**
 
 > **Project status:** actively released, Beta. Universal Flasher is the standalone, device-agnostic flasher in this ecosystem: firmware plus Software-OS flashing (Kali/Tails/Arch to USB), shipped in v1.4.0. Broader all-in-one device control (controller, logger, wardriving, access gate) lives in the flagship successor, **[cyber-controller](https://github.com/LxveAce/cyber-controller)** (v1.5.0). This repo stays focused on the flashing/provisioning side and works fine on its own.
