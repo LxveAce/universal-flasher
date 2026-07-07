@@ -111,7 +111,7 @@ Public repo. Frame all security work as responsible hardening; do NOT publish st
 - **Build/release:** build.py (PyInstaller --onefile); build-release.yml builds Windows x64 / macOS arm64 / Linux x64 / Linux arm64 per release.
 - **Lineage:** headless-marauder-gui -> universal-flasher (this repo) + universal-flasher-ui (superseded) -> cyber-controller (flagship convergence + built-in Dead Man's Switch). Reuse from cyber-controller: `src/core/deadman_auth.py` (directive 2), backends/protocols/21 profiles (avoid re-duplicating).
 - **External services:** GitHub Releases API (firmware discovery); kali.download (already allowlisted); **tails.net/tails.boum.org (NEW, needed for directive 1)**.
-- **Public hubs:** esp32marauder.com (homepage), cybercontroller.org, lxveace.com, Discord discord.gg/lxveace.
+- **Public hubs:** esp32marauder.com (homepage), cybercontroller.org, lxveace.com, Discord discord.gg/lxvelabs.
 
 ## Open questions
 

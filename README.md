@@ -317,9 +317,10 @@ MIT — see [LICENSE](LICENSE).
 
 ## Connect
 
-- **Discord:** [discord.gg/lxveace](https://discord.gg/lxveace) — questions, help, or to talk through this project
+- **Discord:** [discord.gg/lxvelabs](https://discord.gg/lxvelabs) — questions, help, or to talk through this project
 - **GitHub:** [@LxveAce](https://github.com/LxveAce)
-- **Website:** [lxveace.com](https://lxveace.com)
+- **Email:** LxveLabs@proton.me (business) · lxveace@proton.me (direct)
+- **Website:** [lxvelabs.com](https://lxvelabs.com) · personal: [lxveace.com](https://lxveace.com)
 - **Project site:** [esp32marauder.com](https://esp32marauder.com)
 
 ---
