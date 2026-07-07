@@ -99,7 +99,7 @@ All commands from the Marauder CLI. "runs until STOP" means it keeps going until
 `ls`/`save`/`load` (SD card) · `settings -s <name> enable/disable` (e.g. SavePCAP) · `led` · `reboot` · `stopscan`.
 
 > Full list with every flag is in *Help → Command Reference* and in
-> [`marauder_core/commands.py`](marauder_core/commands.py).
+> [`uf_core/commands.py`](uf_core/commands.py).
 
 ---
 
@@ -192,14 +192,14 @@ PCAP, evil portal captures, and wardrive CSVs live on the board's SD card (use `
 
 ## 6. Works with
 
-- **Your own dashboard** — `marauder_core` is importable; build a dashboard on it to show Marauder
+- **Your own dashboard** — `uf_core` is importable; build a dashboard on it to show Marauder
   beside other tools (Kismet/Meshtastic/GPS).
 - **Kismet** — run Kismet on the Pi for deep WiFi mapping while Marauder does active attacks; both
   can share the **same GPS** via `gpsd` (`localhost:2947`).
 - **Wireshark / hashcat / aircrack-ng / hcxtools** — for PCAP analysis and cracking (chain A).
 - **WiGLE** — wardrive CSVs (chain D).
 - **Flipper Zero** — pair sub-GHz/RFID/NFC/IR work (Flipper) with WiFi/BLE (this) for full coverage.
-- **The cyberdeck** — `marauder_core` is importable; the deck's dashboard reuses it alongside Kismet, Meshtastic, and GPS.
+- **The cyberdeck** — `uf_core` is importable; the deck's dashboard reuses it alongside Kismet, Meshtastic, and GPS.
 - **Kismet** — run it on the Pi for passive WiFi mapping while Marauder handles active attacks. Both can share GPS via `gpsd`.
 - **Wireshark / hashcat / aircrack-ng / hcxtools** — for PCAP analysis and cracking.
 - **WiGLE** — for wardrive map uploads.

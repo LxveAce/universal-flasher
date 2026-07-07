@@ -1,13 +1,13 @@
 # Security Policy
 
-Only the latest release (1.2.x) gets security patches. If you're on an older version, update first.
+Only the latest release (1.4.0) gets security patches. If you're on an older version, update first.
 
 ## Reporting a vulnerability
 
 **Don't open a public issue.** Instead:
 
-1. Use [GitHub Security Advisories](https://github.com/LxveAce/headless-marauder-gui/security/advisories) (preferred), or
-2. Email **lxveace@proton.me** with `[SECURITY] headless-marauder-gui` in the subject.
+1. Use [GitHub Security Advisories](https://github.com/LxveAce/universal-flasher/security/advisories) (preferred), or
+2. Email **lxveace@proton.me** with `[SECURITY] universal-flasher` in the subject.
 
 Include what you found, how to reproduce it, and which version you're running. I'll acknowledge it within a couple days and try to get a patch out within two weeks for anything serious.
 

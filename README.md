@@ -8,7 +8,7 @@ Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero,
 
 **Built on the [Headless Marauder GUI](https://github.com/LxveAce/headless-marauder-gui) scaffold.**
 
-> **Project status:** actively released, Beta. Universal Flasher is the standalone, device-agnostic flasher in this ecosystem: firmware plus Software-OS flashing (Kali/Tails/Arch to USB), shipped in v1.4.0. Broader all-in-one device control (controller, logger, wardriving, access gate) lives in the flagship successor, **[cyber-controller](https://github.com/LxveAce/cyber-controller)** (v1.5.0). This repo stays focused on the flashing/provisioning side and works fine on its own.
+> **Project status:** actively released, Beta. Universal Flasher is the standalone, device-agnostic flasher in this ecosystem: firmware plus Software-OS flashing (Kali/Tails/Arch to USB), shipped in v1.4.0. Broader all-in-one device control (controller, logger, wardriving, access gate) lives in the flagship successor, **[cyber-controller](https://github.com/LxveAce/cyber-controller)** (v1.6.3). This repo stays focused on the flashing/provisioning side and works fine on its own.
 
 <!-- STATUS-ROADMAP:START -->
 ## Status & Roadmap

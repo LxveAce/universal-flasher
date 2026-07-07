@@ -22,12 +22,12 @@ Bug reports, feature requests, and PRs are all welcome.
 
 ## Reporting bugs
 
-Open a [GitHub issue](https://github.com/LxveAce/headless-marauder-gui/issues). Include your OS, Python version, steps to reproduce, and any tracebacks. If it's hardware-related, mention your board type (classic ESP32, S3, etc.).
+Open a [GitHub issue](https://github.com/LxveAce/universal-flasher/issues). Include your OS, Python version, steps to reproduce, and any tracebacks. If it's hardware-related, mention your board type (classic ESP32, S3, etc.).
 
 ## Pull requests
 
 - Branch off `main`, keep commits focused
-- If your change touches `marauder_core/`, test it across all four UIs (Qt, Tk, TUI, Web)
+- If your change touches `uf_core/`, test it across all four UIs (Qt, Tk, TUI, Web)
 - Update `GUIDE.md` if you add or change commands
 - Open a PR with a clear description
 
@@ -37,19 +37,19 @@ Python 3.9+. Follow whatever patterns are already in the code — it's kept pret
 
 ## Adding commands
 
-New Marauder commands go in `marauder_core/commands.py` — add a `Command(...)` to the right category in `build()`. All four UIs pick it up automatically from there.
+New Marauder commands go in `uf_core/commands.py` — add a `Command(...)` to the right category in `build()`. All four UIs pick it up automatically from there.
 
 ## Project layout
 
 ```
-marauder_core/     Shared library (controller, parser, commands, flasher, capture, updater)
+uf_core/           Shared library (controller, parser, commands, flasher, capture, updater)
 gui_qt/            PyQt5 desktop GUI
 gui/               Tkinter GUI
 tui/               Textual terminal UI
 web/               Flask + SocketIO browser UI
 ```
 
-All four front-ends import from `marauder_core` and follow the same pattern. Core features should work across all UIs; UI-specific stuff stays in that UI's folder.
+All four front-ends import from `uf_core` and follow the same pattern. Core features should work across all UIs; UI-specific stuff stays in that UI's folder.
 
 ## Security issues
 
