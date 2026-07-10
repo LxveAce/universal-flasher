@@ -8,7 +8,7 @@
 This document covers the **FORK** variant (SPEC §1, the default for all flash sizes incl. 4 MB):
 the gate is compiled *into* a fork of ESP32Marauder and called once from `setup()`, reusing
 Marauder's own display / keyboard / SD drivers. GUARDIAN (SPEC §1, 8 MB+) is templated by
-`../partitions/suicide_guardian_16MB.csv` but is **not** the path described step-by-step here.
+`../../partitions/suicide_guardian_16MB.csv` but is **not** the path described step-by-step here.
 
 **Always build and test `SUICIDE_SAFE_MODE` first** (SPEC §5). In SAFE mode the entire
 detect → arm → trigger → erase chain runs against a scratch partition + dummy key and only
@@ -234,10 +234,10 @@ firmware both key off `guardcfg` (SPEC §3). Pick the CSV for your flash size:
 
 | Flash | CSV | Notes |
 |-------|-----|-------|
-| 4 MB (classic ESP32 / CYD) | [`../partitions/suicide_4MB.csv`](../partitions/suicide_4MB.csv) | single app slot; Marauder SD-OTA self-update disabled (documented trade, SPEC §3.1) |
-| 8 MB | [`../partitions/suicide_8MB.csv`](../partitions/suicide_8MB.csv) | dual app slot + roomier guardcfg |
-| 16 MB | [`../partitions/suicide_16MB.csv`](../partitions/suicide_16MB.csv) | dual app slot, large spiffs, 64 KB guardcfg (SPEC §3.2) |
-| 16 MB GUARDIAN | [`../partitions/suicide_guardian_16MB.csv`](../partitions/suicide_guardian_16MB.csv) | factory(Guardian)+ota_0(Marauder); not this guide's flow |
+| 4 MB (classic ESP32 / CYD) | [`../../partitions/suicide_4MB.csv`](../../partitions/suicide_4MB.csv) | single app slot; Marauder SD-OTA self-update disabled (documented trade, SPEC §3.1) |
+| 8 MB | [`../../partitions/suicide_8MB.csv`](../../partitions/suicide_8MB.csv) | dual app slot + roomier guardcfg |
+| 16 MB | [`../../partitions/suicide_16MB.csv`](../../partitions/suicide_16MB.csv) | dual app slot, large spiffs, 64 KB guardcfg (SPEC §3.2) |
+| 16 MB GUARDIAN | [`../../partitions/suicide_guardian_16MB.csv`](../../partitions/suicide_guardian_16MB.csv) | factory(Guardian)+ota_0(Marauder); not this guide's flow |
 
 - **arduino-cli / IDE:** copy the chosen CSV to `partitions.csv` in the sketch folder and select a
   matching custom partition scheme, **or** pass `--build-property
@@ -420,5 +420,5 @@ separate `factory` app that hands off to an unmodified Marauder in `ota_0` via
 Guardian must re-assert by selecting **factory** explicitly (erase `otadata` or
 `set_boot_partition(factory)`) and enable `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` so a Marauder
 that never marks itself valid auto-reverts to the Guardian. Partition template:
-[`../partitions/suicide_guardian_16MB.csv`](../partitions/suicide_guardian_16MB.csv). This guide
+[`../../partitions/suicide_guardian_16MB.csv`](../../partitions/suicide_guardian_16MB.csv). This guide
 otherwise documents FORK only.
