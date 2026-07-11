@@ -447,5 +447,3 @@ straight from the manifest). The full list:
 | SD remanence (FTL) | documented best-effort, not guaranteed | §6, `SAFETY.md` |
 | Low-battery boot policy | brownout/undervoltage boot SUPPRESSES destruction (never wipes) but the CORRECT PASSWORD IS STILL REQUIRED to boot — no bypass (reliability-first) | `BootGate` / `GateConfig`, `THREAT-MODEL.md` |
 | KDF iteration tuning | default 10000, tune on target for ~1 s UX | §8, `SPEC.md` §9 |
-</content>
-</invoke>
