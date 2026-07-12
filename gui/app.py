@@ -332,6 +332,22 @@ class MarauderGUI(tk.Tk):
             messagebox.showerror("Connection failed", str(e))
             self._append(f"[error] {e}", "sys")
 
+    def _sync_connection_ui(self):
+        """Keep the Connect button + status honest when the session is dropped from OUTSIDE
+        _toggle_connect (the flasher calls ctl.disconnect() to free the port for esptool). Without
+        this the window shows 'connected'/'Disconnect' on a disconnected controller and the button's
+        action then inverts (labelled Disconnect but actually connects)."""
+        connected = self.ctl.connected
+        if connected == getattr(self, "_last_connected", None):
+            return
+        self._last_connected = connected
+        if connected:
+            self.status.config(text=f"connected: {self.ctl.port}", fg=ACCENT)
+            self.connect_btn.config(text="Disconnect")
+        else:
+            self.status.config(text="disconnected", fg=DANGER)
+            self.connect_btn.config(text="Connect")
+
     # --- console ---------------------------------------------------------- #
     def _poll_queue(self):
         if self._closing:
@@ -344,6 +360,7 @@ class MarauderGUI(tk.Tk):
                 self.logger.write_serial(line)
         except queue.Empty:
             pass
+        self._sync_connection_ui()
         self._poll_id = self.after(40, self._poll_queue)
 
     def _append(self, line, tag=None):

@@ -911,6 +911,9 @@ class MainWindow(QMainWindow):
         right = QWidget(); rl = QVBoxLayout(right)
         self.tabs = QTabWidget()
         self.console = QPlainTextEdit(); self.console.setReadOnly(True)
+        # Bound the main console like the FlasherDialog console + the Tk consoles: a device streaming
+        # lines without limit (autolist every 3s, or a wrong-baud flood) would otherwise grow it forever.
+        self.console.setMaximumBlockCount(10000)
         self.console.setFont(QFont("monospace", 10))
         self.console.setToolTip("Live serial output from the board.")
         ci = self.tabs.addTab(self.console, "Console")
@@ -1231,6 +1234,23 @@ class MainWindow(QMainWindow):
                 self.logger.write_serial(line)
         except queue.Empty:
             pass
+        self._sync_connection_ui()
+
+    def _sync_connection_ui(self):
+        """Keep the Connect button + status honest when the session is dropped from OUTSIDE _toggle —
+        the flasher calls ctl.disconnect() to free the port for esptool, and a serial read error clears
+        it too. Without this the window still shows 'connected: COMx'/'Disconnect' on a disconnected
+        controller and every command then errors 'not connected'."""
+        connected = self.ctl.connected
+        if connected == getattr(self, "_last_connected", None):
+            return
+        self._last_connected = connected
+        if connected:
+            self.status.setText(f"connected: {self.ctl.port}"); self.status.setStyleSheet("color:#39ff14;")
+            self.connect_btn.setText("Disconnect")
+        else:
+            self.status.setText("disconnected"); self.status.setStyleSheet("color:#ff4d4d;")
+            self.connect_btn.setText("Connect")
 
     def _append(self, line):
         self.console.appendPlainText(line)
@@ -1259,6 +1279,14 @@ class MainWindow(QMainWindow):
                 self.logger.write_snapshot(aps, stas, {"port": self.ctl.port})
 
     def closeEvent(self, ev):
+        # Refuse to tear down while the Software-OS tab is writing an image to a USB drive — destroying
+        # its running QThread mid-write aborts the app (Qt) and truncates the raw-device write.
+        so = getattr(self, "software_os", None)
+        if so is not None and so.is_flashing():
+            QMessageBox.warning(self, "Flashing",
+                                "An OS image is still being written to the USB drive — "
+                                "let it finish before closing.")
+            ev.ignore(); return
         try:
             self.t_autolist.stop()
             self.logger.stop()

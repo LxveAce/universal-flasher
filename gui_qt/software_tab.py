@@ -293,6 +293,11 @@ class SoftwareOSTab(QWidget):
         self._worker.finished.connect(self._on_done)
         self._worker.start()
 
+    def is_flashing(self) -> bool:
+        """True while a destructive USB write is in flight — the main window checks this on close so
+        the QThread isn't destroyed mid-run (Qt abort) and the raw-device write isn't truncated."""
+        return self._worker is not None and self._worker.isRunning()
+
     def _on_progress(self, pct: int, msg: str) -> None:
         if pct >= 0:
             self._progress.setValue(pct)

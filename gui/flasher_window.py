@@ -51,6 +51,13 @@ class FlasherWindow(tk.Toplevel):
             self.port_var.set(default_port)
 
     def _on_close(self):
+        # Mirror the Qt flasher: don't tear down mid-flash — the esptool subprocess keeps running in a
+        # daemon thread with its output discarded, so the operator thinks the flash finished and may
+        # power-cycle the board mid-write. Make them let it finish.
+        if self._busy:
+            messagebox.showwarning(
+                "Flashing", "A flash/erase is in progress — let it finish before closing.")
+            return
         self._closed = True
         if self._poll_id is not None:
             try:
