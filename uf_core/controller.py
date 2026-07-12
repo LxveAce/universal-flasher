@@ -21,6 +21,11 @@ except Exception:  # pyserial not installed yet
 
 _CH340_HINTS = ("ch340", "ch341", "cp210", "qinheng", "silicon labs", "wch", "usb-serial", "usb serial")
 
+# Upper bound on an un-terminated read buffer. A well-behaved Marauder emits newline-terminated lines; a
+# device streaming bytes with no '\n' (garbage / wrong baud / hostile firmware) must not grow the buffer
+# without bound.
+_MAX_LINE_BYTES = 64 * 1024
+
 
 class MarauderController:
     def __init__(self, port: Optional[str] = None, baud: int = 115200, mock: bool = False):
@@ -115,6 +120,11 @@ class MarauderController:
                 while b"\n" in buf:
                     line, buf = buf.split(b"\n", 1)
                     self._emit(line.decode("utf-8", "replace").rstrip("\r"))
+                # Never let a newline-less stream grow the buffer without bound: flush the oversized
+                # partial line and reset so a missing terminator can't exhaust memory.
+                if len(buf) > _MAX_LINE_BYTES:
+                    self._emit(buf.decode("utf-8", "replace").rstrip("\r"))
+                    buf = b""
 
     def disconnect(self):
         self._running = False

@@ -48,8 +48,9 @@ def _fetch_release(repo: str) -> Optional[Dict]:
         _require_allowed_url(api_url)
         data = json.loads(_http_get(api_url).decode("utf-8"))
     except urllib.error.HTTPError as e:
-        if e.code == 429:
-            # rate limited — use cached if available, even if stale
+        if e.code in (429, 403):
+            # rate limited (GitHub returns 403 for the unauthenticated hourly cap, 429 for secondary
+            # limits) — degrade gracefully: use cached if available, even if stale.
             with _cache_lock:
                 if cached:
                     return cached[1]

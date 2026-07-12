@@ -144,8 +144,35 @@ def _adb_argv(*args: str) -> List[str]:
     return [adb, *args]
 
 
+# Flags whose following value (or "--flag=value" tail) is a secret and must never be echoed.
+_SENSITIVE_FLAGS = ("--admin-password", "--password", "--passwd", "--pin", "--token")
+
+
+def _redact_argv(args: List[str]) -> List[str]:
+    """Copy of argv with the value after any sensitive flag replaced by '***' (for display only)."""
+    out: List[str] = []
+    redact_next = False
+    for a in args:
+        if redact_next:
+            out.append("***")
+            redact_next = False
+            continue
+        low = a.lower()
+        for f in _SENSITIVE_FLAGS:
+            if low == f:
+                out.append(a)
+                redact_next = True
+                break
+            if low.startswith(f + "="):
+                out.append(a[: len(f)] + "=***")
+                break
+        else:
+            out.append(a)
+    return out
+
+
 def _run_adb(args: List[str], on_line: Line, timeout: int = 120) -> Tuple[int, str]:
-    on_line("$ " + " ".join(args))
+    on_line("$ " + " ".join(_redact_argv(args)))
     try:
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, text=True, bufsize=1)

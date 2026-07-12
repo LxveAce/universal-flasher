@@ -47,6 +47,10 @@ def build(cmd: Command, values: Optional[Dict[str, Any]] = None) -> str:
             continue
         if v in (None, ""):
             continue
+        # Defense-in-depth: a CR/LF embedded in a value would let a single param emit a second
+        # serial command line. Collapse any newline to a space so one Command -> one line.
+        if isinstance(v, str) and ("\n" in v or "\r" in v):
+            v = v.replace("\r", " ").replace("\n", " ")
         token = f"{p.flag} {v}" if p.flag else str(v)
         parts.append(token)
     return " ".join(str(x) for x in parts).strip()

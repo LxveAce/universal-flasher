@@ -13,6 +13,7 @@ machine can `tail -f` the serial log or read latest.json. No server required.
 import csv
 import json
 import os
+import threading
 import time
 from dataclasses import asdict, is_dataclass
 from typing import List, Optional
@@ -39,6 +40,10 @@ class CaptureLogger:
         self._serial_path = None
         self.session = None
         self._pending = 0
+        # Serializes the fp check-and-write (write_serial, on the reader thread) against the
+        # close-and-null in stop()/start() (on the UI thread). Without it a log toggle could null
+        # self._fp between write_serial's check and its write, silently dropping in-flight lines.
+        self._lock = threading.Lock()
 
     # --- lifecycle -------------------------------------------------------- #
     def set_dir(self, directory: str):
@@ -51,24 +56,31 @@ class CaptureLogger:
 
     def start(self, stamp: Optional[str] = None) -> str:
         os.makedirs(self.dir, exist_ok=True)
-        self.session = stamp or time.strftime("%Y%m%d-%H%M%S")
-        self._serial_path = os.path.join(self.dir, f"serial-{self.session}.log")
-        self._fp = open(self._serial_path, "a", encoding="utf-8")
-        self._fp.write(f"# session {self.session} started {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        self._fp.flush()
-        self._pending = 0
-        self.enabled = True
-        return self._serial_path
+        session = stamp or time.strftime("%Y%m%d-%H%M%S")
+        path = os.path.join(self.dir, f"serial-{session}.log")
+        fp = open(path, "a", encoding="utf-8")
+        fp.write(f"# session {session} started {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        fp.flush()
+        with self._lock:                       # publish the new fp atomically vs. write_serial
+            self.session = session
+            self._serial_path = path
+            self._fp = fp
+            self._pending = 0
+            self.enabled = True
+        return path
 
     def stop(self):
-        self.enabled = False
-        if self._fp:
+        with self._lock:                       # detach the fp before any writer can touch it
+            self.enabled = False
+            fp = self._fp
+            self._fp = None
+            self._pending = 0
+        if fp:
             try:
-                self._fp.flush()
-                self._fp.close()
+                fp.flush()
+                fp.close()
             except Exception:
                 pass
-        self._fp = None
 
     @property
     def serial_path(self) -> Optional[str]:
@@ -76,16 +88,17 @@ class CaptureLogger:
 
     # --- writes ----------------------------------------------------------- #
     def write_serial(self, line: str):
-        if not (self.enabled and self._fp):
-            return
-        try:
-            self._fp.write(line + "\n")
-            self._pending += 1
-            if self._pending >= self._FLUSH_EVERY:   # batch flushes — don't stall the UI per line
-                self._fp.flush()
-                self._pending = 0
-        except Exception:
-            pass
+        with self._lock:                       # hold across check+write so stop() can't null fp mid-flight
+            if not (self.enabled and self._fp):
+                return
+            try:
+                self._fp.write(line + "\n")
+                self._pending += 1
+                if self._pending >= self._FLUSH_EVERY:   # batch flushes — don't stall the UI per line
+                    self._fp.flush()
+                    self._pending = 0
+            except Exception:
+                pass
 
     def write_snapshot(self, aps: List, stations: List, meta: Optional[dict] = None):
         """Atomically refresh latest.json + aps.csv + stations.csv from parsed state."""
