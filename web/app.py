@@ -469,11 +469,11 @@ def on_flash_suicide_provision(data):
     try:
         arm_pin = int(data.get("arm_pin", 27))
         max_att = int(data.get("max_att", 2))
+        deadman = int(data.get("deadman", 1))
+        armed = int(data.get("armed", 0))
     except (TypeError, ValueError):
-        emit("flash_status", {"error": "arm_pin and max_att must be numbers"})
+        emit("flash_status", {"error": "arm_pin, max_att, deadman and armed must be numbers"})
         return
-    deadman = int(data.get("deadman", 1))
-    armed = int(data.get("armed", 0))
     build_dir = (data.get("build_dir") or "").strip() or None
     chip_hint = data.get("chip") or None
     try:

@@ -86,6 +86,8 @@ def build_bundle(
     wipe_sd=1,
     brick=0,
     sd_passes=1,
+    flash_passes=1,
+    fast_wipe=0,
     kdf_iter=10000,
     on_line=None,
 ):
@@ -136,6 +138,8 @@ def build_bundle(
         wipe_sd=wipe_sd,
         brick=brick,
         sd_passes=sd_passes,
+        flash_passes=flash_passes,
+        fast_wipe=fast_wipe,
         kdf_iter=kdf_iter,
     )
 
