@@ -127,3 +127,54 @@ def test_flash_checksums_sig_bad_sig_refuses(img, monkeypatch):
     with pytest.raises(ValueError, match="SHA256SUMS signature"):
         oc.flash_os_image(oc.get_image("kali"), r, path, r"\\.\PhysicalDrive9", _silent,
                           checksums_path=path, checksums_sig_path=path + ".gpg", confirmed=True)
+
+
+# ── UF-4a: verify hardening (fail-closed + no GPG short-circuit + guarded redirects) ──────────
+
+def test_flash_image_sig_enforces_sha_even_when_gpg_passes(img, monkeypatch):
+    """Belt-and-suspenders: a GPG 'pass' must NOT short-circuit the pinned SHA-256 — this closes the
+    'GPG accepted by ANY keyring key' fail-open (e.g. Arch pins no fingerprint)."""
+    path, _sha = img
+    monkeypatch.setattr(oc, "verify_gpg_detached", lambda *a, **k: True)   # pretend GPG verified
+    wrote = {"x": False}
+    monkeypatch.setattr(oc.sd, "write_image", lambda *a, **k: wrote.__setitem__("x", True) or 0)
+    r = _resolved_image_sig("0" * 64)                                       # sha256 will NOT match
+    with pytest.raises(ValueError, match="SHA-256"):
+        oc.flash_os_image(oc.get_image("arch"), r, path, r"\.\PhysicalDrive9", _silent,
+                          sig_path=path + ".sig", confirmed=True)
+    assert wrote["x"] is False                                             # never wrote despite GPG 'pass'
+
+
+def test_flash_fails_closed_when_unverified(img, monkeypatch):
+    """No signature and no expected SHA-256 -> refuse to write (was warn-and-write, a fail-open)."""
+    path, _sha = img
+    wrote = {"x": False}
+    monkeypatch.setattr(oc.sd, "write_image", lambda *a, **k: wrote.__setitem__("x", True) or 0)
+    r = _resolved_image_sig("")                                            # no sha256, no sig passed
+    with pytest.raises(ValueError, match="UNVERIFIED"):
+        oc.flash_os_image(oc.get_image("arch"), r, path, r"\.\PhysicalDrive9", _silent, confirmed=True)
+    assert wrote["x"] is False
+
+
+class _FakeResp:
+    def __init__(self, redirect=False, location=""):
+        self.is_redirect = redirect
+        self.is_permanent_redirect = False
+        self.headers = {"Location": location}
+
+    def close(self):
+        pass
+
+
+def test_guarded_get_rejects_redirect_off_allowlist(monkeypatch):
+    """The metadata GET must re-validate each redirect hop against the allowlist (SSRF), like download()."""
+    monkeypatch.setattr(oc.requests, "get",
+                        lambda url, **k: _FakeResp(redirect=True, location="https://evil.example.com/x"))
+    with pytest.raises(ValueError):
+        oc._guarded_get("https://cdimage.kali.org/meta.json")
+
+
+def test_guarded_get_returns_non_redirect_response(monkeypatch):
+    resp = _FakeResp(redirect=False)
+    monkeypatch.setattr(oc.requests, "get", lambda url, **k: resp)
+    assert oc._guarded_get("https://cdimage.kali.org/meta.json") is resp

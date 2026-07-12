@@ -139,16 +139,29 @@ def list_images(path: Optional[str] = None) -> List[Dict[str, str]]:
 
 # ── HTTP helpers (allowlisted; monkeypatched in tests) ───────────────
 
+def _guarded_get(url: str, timeout: int = 30):
+    """GET that re-validates EVERY redirect hop against the OS allowlist (mirrors download() /
+    sd_backend._download). Without this an allowlisted upstream could 3xx us to an arbitrary or
+    internal host (SSRF) — the metadata resolvers used to follow redirects unchecked."""
+    current = _require_os_url(url)
+    for _ in range(8):
+        resp = requests.get(current, timeout=timeout, allow_redirects=False)
+        if resp.is_redirect or resp.is_permanent_redirect:
+            current = _require_os_url(resp.headers.get("Location", ""))
+            resp.close()
+            continue
+        return resp
+    raise ValueError("too many redirects fetching the OS metadata")
+
+
 def _http_get_text(url: str, timeout: int = 30) -> str:
-    _require_os_url(url)
-    resp = requests.get(url, timeout=timeout)
+    resp = _guarded_get(url, timeout)
     resp.raise_for_status()
     return resp.text
 
 
 def _http_get_json(url: str, timeout: int = 30) -> Any:
-    _require_os_url(url)
-    resp = requests.get(url, timeout=timeout)
+    resp = _guarded_get(url, timeout)
     resp.raise_for_status()
     return resp.json()
 
@@ -306,9 +319,14 @@ def verify_gpg_detached(target_path: str, sig_path: str, fingerprint: Optional[s
         return None
     status = proc.stdout + proc.stderr
     flat = status.replace(" ", "")
-    good = ("VALIDSIG" in status or "GOODSIG" in status)
-    if fingerprint:
-        good = good and fingerprint.replace(" ", "") in flat
+    if not fingerprint:
+        # No expected fingerprint pinned (e.g. Arch ships gpg_fingerprint: null). A GOODSIG from ANY
+        # key already in the local keyring would otherwise pass UNBOUND — a verify-fail-open. Treat as
+        # unverified so the caller falls through to the pinned SHA-256 instead of trusting any key.
+        on_line("[os] no expected GPG fingerprint pinned — treating the signature as unverified "
+                "(the pinned SHA-256 will be used instead).")
+        return None
+    good = ("VALIDSIG" in status or "GOODSIG" in status) and fingerprint.replace(" ", "") in flat
     on_line("[os] GPG signature " + ("VALID" if good else "NOT valid for the expected key"))
     return good
 
@@ -375,18 +393,25 @@ def flash_os_image(entry: OSImage, resolved: Resolved, image_path: str, device: 
     else:
         if sig_path:
             result = verify_gpg_detached(image_path, sig_path, fpr, on_line)
+            if result is False:
+                raise ValueError("GPG signature is NOT valid for the expected key — refusing to write.")
             if result is True:
                 verified = True
-            elif result is False:
-                raise ValueError("GPG signature is NOT valid for the expected key — refusing to write.")
-        if not verified and resolved.sha256:
+        # ALWAYS also enforce the pinned SHA-256 when present — an independent check, and it closes the
+        # "GPG passed by an unpinned/any keyring key" gap (e.g. Arch, which pins no fingerprint) rather
+        # than letting a GPG pass short-circuit the hash.
+        if resolved.sha256:
             if not verify_sha256(image_path, resolved.sha256, on_line, on_progress):
                 raise ValueError("SHA-256 does not match — refusing to write an unverified image.")
             verified = True
 
     if not verified:
-        on_line(f"[os] WARNING: {entry.name} image is UNVERIFIED (no valid signature/checksum). "
-                "Strongly verify against the official source before writing.")
+        # Fail CLOSED: never write an image we could not authenticate (no valid signature AND no
+        # expected SHA-256). Shipped catalog entries always pin a SHA-256, so this only guards a
+        # future/custom entry that lacks both — refuse rather than warn-and-write.
+        raise ValueError(
+            f"refusing to write {entry.name}: image is UNVERIFIED (no valid signature and no expected "
+            "SHA-256 to check against). Repair the catalog entry's checksum/signature and retry.")
 
     rc = sd.write_image(image_path, device, on_line, on_progress, confirmed=True)
     if rc != 0:
