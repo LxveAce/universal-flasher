@@ -132,10 +132,13 @@ class MarauderParser:
 
     # --- accessors -------------------------------------------------------- #
     def indexed_aps(self):
-        return [self.aps[i] for i in sorted(self.aps)]
+        # Snapshot values() atomically (one C call under the GIL) then sort the materialised list —
+        # never re-index the dict, so a concurrent reader-thread insert/clear (web front-end) can't
+        # raise KeyError mid-iteration and silently kill the live-table pusher.
+        return sorted(self.aps.values(), key=lambda a: a.index)
 
     def indexed_stations(self):
-        return [self.stations[i] for i in sorted(self.stations)]
+        return sorted(self.stations.values(), key=lambda s: s.index)
 
     def ap_rows(self):
         if self.aps:

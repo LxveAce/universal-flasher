@@ -529,7 +529,13 @@ def _table_pusher():
         socketio.sleep(0.7)
         if parser.dirty:
             parser.dirty = False
-            _push_tables()
+            try:
+                _push_tables()
+            except Exception:
+                # A transient read of the live parser dicts (mutated on the serial reader thread)
+                # must never kill this loop — otherwise the web AP/Station tables silently stop
+                # updating for the rest of the session. Re-mark dirty so the next tick retries.
+                parser.dirty = True
 
 socketio.start_background_task(_table_pusher)
 
