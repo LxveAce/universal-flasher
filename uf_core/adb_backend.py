@@ -591,7 +591,12 @@ def install_rayhunter(on_line: Line, serial: Optional[str] = None,
                 return 1
             on_line("[rayhunter] sha256 OK")
         except Exception as e:
-            on_line(f"[warning] could not verify sha256: {e}")
+            # Fail CLOSED: a checksum asset exists (verification was expected), so an error fetching/
+            # parsing/hashing it must NOT silently downgrade to no integrity check and then extract +
+            # execute the downloaded installer binary. Abort the install.
+            on_line(f"[error] sha256 verification could not complete: {e} — refusing to install an "
+                    "unverified binary (the release publishes a checksum, but it could not be checked).")
+            return 1
 
     extract_dir = os.path.join(cache, f"rayhunter-{tag}")
     if os.path.isdir(extract_dir):

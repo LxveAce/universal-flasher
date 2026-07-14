@@ -137,7 +137,11 @@ def check_health(port: str, expected_firmware: str, on_line: Line,
         else:
             result.warnings.append("No firmware signature detected in boot output")
             on_line(f"[health] WARN — no boot signature matched on {port} after {elapsed}ms")
-            result.healthy = len(lines) > 0
+            # Seeing arbitrary serial bytes is NOT proof the expected firmware booted: a mis-flashed
+            # board, a bootloader error loop, or an entirely different firmware all still emit output.
+            # With no known signature match we cannot confirm the flash succeeded, so report unhealthy
+            # (verify-never-fake) rather than green just because some bytes arrived.
+            result.healthy = False
 
     finally:
         try:

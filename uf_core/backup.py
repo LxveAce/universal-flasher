@@ -154,6 +154,33 @@ def restore_flash(port: str, backup_path: str, on_line: Line,
                 on_line("[error] Could not detect chip")
                 return 1
 
+    # Integrity gate (defense against on-disk bit-rot / a truncated copy of the recovery artifact):
+    # backup_flash records the dump's sha256 in the .meta for exactly this check. If it's present,
+    # re-hash the file and REFUSE to flash a backup whose bytes no longer match. Without this,
+    # write_flash would push the corrupt bytes and the post-write verify_flash below would STILL pass
+    # (it compares the flash against this SAME file), reporting a "verified" success while the board is
+    # bricked. A missing .meta/sha256 (older backup) warns and proceeds — there is nothing to check.
+    expected_sha = None
+    meta_path = backup_path + ".meta"
+    if os.path.isfile(meta_path):
+        with open(meta_path, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("sha256="):
+                    expected_sha = line.split("=", 1)[1].strip()
+                    break
+    if expected_sha:
+        actual_sha = _sha256(backup_path)
+        if actual_sha.lower() != expected_sha.lower():
+            on_line(f"[error] backup integrity check FAILED: file sha256 {actual_sha[:16]}... != .meta "
+                    f"record {expected_sha[:16]}... — the backup is corrupt/truncated. Refusing to "
+                    "restore it (a corrupt write would brick the board yet still 'verify', because "
+                    "verify compares the flash against this same file). Use a known-good backup.")
+            return 1
+        on_line(f"[restore] backup integrity OK (sha256 {actual_sha[:16]}...)")
+    else:
+        on_line("[warning] no sha256 in the backup .meta (older backup) — restoring without an integrity "
+                "check; the post-write verify only compares against this same file.")
+
     size = os.path.getsize(backup_path)
     on_line(f"[restore] Writing {size} bytes to {port} ({chip})...")
 
