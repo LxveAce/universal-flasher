@@ -34,7 +34,8 @@ ProvisionError = prov.ProvisionError
 
 
 def _args(**over):
-    ns = dict(kdf_iter=10000, max_att=2, arm_level=1, arm_pull=2, arm_pin=27, chip="esp32")
+    ns = dict(kdf_iter=10000, max_att=2, arm_level=1, arm_pull=2, arm_pin=27, chip="esp32",
+              sd_passes=1, flash_passes=1)
     ns.update(over)
     return argparse.Namespace(**ns)
 
@@ -73,6 +74,31 @@ def test_valid_args_still_accepted():
 def test_u8_boundary_values_accepted():
     # 255 is the top of the u8 range -> IN bounds; must not raise for the bound itself.
     assert prov.validate_args(_args(max_att=255, arm_pin=255)) is None
+
+
+# ── S7 sweep (bound sd_passes / flash_passes to the NVS u8, same class as arm_pin/max_att) ────────
+# validate_args did not bound the overwrite-pass counts. The CLI coerces them via the _u8 argparse
+# type, but suicide.build_bundle (web/tk/tui/Qt front-ends + cyber-controller) constructs the
+# Namespace directly and bypasses that, so an out-of-range sd_passes/flash_passes reached the u8 NVS
+# row. Kept in parity with the headless-marauder-gui sibling.
+def test_sd_passes_over_u8_rejected():
+    with pytest.raises(ProvisionError):
+        prov.validate_args(_args(sd_passes=300))
+
+
+def test_flash_passes_over_u8_rejected():
+    with pytest.raises(ProvisionError):
+        prov.validate_args(_args(flash_passes=300))
+
+
+def test_passes_negative_rejected():
+    with pytest.raises(ProvisionError):
+        prov.validate_args(_args(sd_passes=-1))
+
+
+def test_passes_boundary_and_zero_accepted():
+    # 0 = skip that overwrite stage (valid); 255 = top of the u8 range (in bounds). Neither raises.
+    assert prov.validate_args(_args(sd_passes=0, flash_passes=255)) is None
 
 
 if __name__ == "__main__":

@@ -757,6 +757,22 @@ def validate_args(args):
             "--max-att must be <= 255: it is stored as an NVS u8 (guardcfg), so a larger value can "
             "never round-trip to the device — the host would emit a count the firmware can't hold."
         )
+    # sd_passes / flash_passes are the overwrite-pass counts, each stored as an NVS u8 (data
+    # namespace). The CLI coerces them via the _u8 argparse type, but the GUI / programmatic callers
+    # (suicide.build_bundle) construct the Namespace directly and bypass that coercion, so bound them
+    # here too (defense-in-depth for every front-end): a value outside 0..255 can't round-trip the u8
+    # field -> a corrupt nvs-gen / a wipe-pass count the firmware can't hold. 0 is valid (skip that
+    # overwrite stage; the fail-closed wipe still runs its other stages).
+    if not (0 <= args.sd_passes <= 255):
+        raise ProvisionError(
+            "--sd-passes must be in [0, 255]: it is stored as an NVS u8, so a value outside that "
+            "range can't be provisioned (sd_passes=%d given)." % args.sd_passes
+        )
+    if not (0 <= args.flash_passes <= 255):
+        raise ProvisionError(
+            "--flash-passes must be in [0, 255]: it is stored as an NVS u8, so a value outside that "
+            "range can't be provisioned (flash_passes=%d given)." % args.flash_passes
+        )
     if args.kdf_iter < 2000:
         # not fatal, but warn loudly to stderr (no password involved)
         sys.stderr.write(
