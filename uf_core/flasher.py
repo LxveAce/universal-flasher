@@ -1615,6 +1615,15 @@ def read_bundle_manifest(bundle_dir: str) -> Dict:
             raise ValueError(f'bundle.json "files"[{i}] must be an object with a "file" key')
         if entry.get("offset_hex") is None and entry.get("offset") is None:
             raise ValueError(f'bundle.json "files"[{i}] is missing an "offset_hex"/"offset"')
+        # The offset must not just be PRESENT but PARSE to an int: an unparseable "offset_hex"
+        # (e.g. "0xZZ") or non-numeric "offset" would otherwise slip past this validator and only
+        # blow up later in _bundle_offset at flash time. Validate it here so the documented
+        # "raises ValueError if malformed" contract holds and _bundle_offset can never raise on a
+        # manifest this function returned.
+        try:
+            _bundle_offset(entry)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f'bundle.json "files"[{i}] has an unparseable offset: {e}')
         # Reject path-traversal in the file name HERE, before any file is opened or esptool is
         # invoked. _safe_bundle_join raises ValueError on a non-basename / absolute / drive-or-
         # UNC / ".."-bearing / dir-escaping name.
