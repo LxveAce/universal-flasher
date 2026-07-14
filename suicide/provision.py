@@ -284,6 +284,13 @@ def validate_password(pw_bytes):
             "password begins with the reserved serial keyword `unlock ` (the serial adapter strips "
             "this prefix before hashing). Choose a password that does not start with `unlock `."
         )
+    if 0 in bytes(pw_bytes):
+        raise ProvisionError(
+            "password contains a NUL byte; the firmware stores the secret in a char[64] C-string and "
+            "truncates at the first NUL before hashing, so the full password could NEVER validate on-"
+            "device (and on an ARMED board the correct password would be counted as a failed attempt "
+            "and trigger the wipe). Remove the NUL byte."
+        )
 
 
 # ----------------------------------------------------------------------------------------------
@@ -745,6 +752,11 @@ def validate_args(args):
             "--max-att must be >= 1 (SPEC section 4.1: max_att is clamped >= 1, always; a value of "
             "0 would arm a wipe with zero failed attempts)"
         )
+    if args.max_att > 255:
+        raise ProvisionError(
+            "--max-att must be <= 255: it is stored as an NVS u8 (guardcfg), so a larger value can "
+            "never round-trip to the device — the host would emit a count the firmware can't hold."
+        )
     if args.kdf_iter < 2000:
         # not fatal, but warn loudly to stderr (no password involved)
         sys.stderr.write(
@@ -770,6 +782,18 @@ def validate_args(args):
             "non-fail-safe arming pair rejected (SPEC section 4.1): arm_level=0 (ARMED=LOW) with "
             "arm_pull=2 (pulldown) idles the pin LOW/ARMED, so a cut wire reads ARMED and defeats "
             "the dead-man. Use the fail-safe pair: arm_level=0 + arm_pull=1 (pullup)."
+        )
+    # arm_pin is stored as an NVS u8 (guardcfg) and selects a physical GPIO. A value outside 0..255
+    # can't be stored at all (it would corrupt guardcfg / fail nvs-gen), so reject it up front: a
+    # fat-fingered pin (e.g. "300", or a negative from a UI that skipped range-checking) becomes a
+    # clear provisioning error instead of a cryptic nvs failure or — worse — an ARMED board baked
+    # with an unusable dead-man pin the owner can never trigger to disarm. (Per-chip GPIO validity
+    # beyond the u8 range stays advisory via the strapping/input-only notes below — the operator may
+    # legitimately know their board better than a hardcoded per-chip map would.)
+    if not (0 <= args.arm_pin <= 255):
+        raise ProvisionError(
+            "--arm-pin must be in [0, 255]: it is stored as an NVS u8 and selects a GPIO, so a value "
+            "outside that range can't be provisioned (arm_pin=%d given)." % args.arm_pin
         )
     # Strapping-pin guard (SPEC section 7). Advisory only -- the operator may know their board.
     # Chip-aware: the forbidden set differs per family. GPIO2, for instance, is a C3 strapping pin
