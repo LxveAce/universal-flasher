@@ -160,6 +160,13 @@ def build_bundle(
     on_line("[suicide] hashing password (PBKDF2-HMAC-SHA256)...")
     salt = os.urandom(prov.SALT_LEN)
     pw_buf = bytearray(password.encode("utf-8"))
+    # Parity guard (mirrors provision.build_bundle): reject a password the firmware would hash
+    # DIFFERENTLY than the host — empty / >63 UTF-8 bytes / leading-trailing whitespace / `unlock `
+    # prefix. Without this, an ARMED board bakes a pwhash the device can never reproduce, so the
+    # owner's OWN correct password is counted as a failed attempt and, after max_att, self-wipes the
+    # board. This is the package-level API every UI calls; provision.build_bundle validates, this did
+    # not (the guard was bypassed on the only code path the UIs use).
+    prov.validate_password(pw_buf)
     with prov._zeroized(pw_buf):
         pwhash = prov.derive_pwhash(pw_buf, salt, args.kdf_iter, prov.KDF_DKLEN)
     del pw_buf

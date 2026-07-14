@@ -25,6 +25,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 from dataclasses import dataclass
 from shutil import which
@@ -348,12 +349,27 @@ def download(url: str, dest_dir: str, on_line: Line, on_progress: Progress = Non
         resp.raise_for_status()
         total = int(resp.headers.get("content-length", 0) or 0)
         written = 0
-        with open(dest, "wb") as fh:
-            for chunk in resp.iter_content(chunk_size=1 << 20):
-                fh.write(chunk)
-                written += len(chunk)
-                if on_progress and total:
-                    on_progress(min(written / total, 1.0))
+        # Stream to a temp sibling then os.replace onto dest. open(dest,"wb") truncates a prior GOOD
+        # cached image to 0 bytes BEFORE the new bytes exist, so a mid-stream failure (a dropped
+        # connection on a re-run) would destroy it. A short read (written < Content-Length) is also
+        # rejected so a silently-truncated download is never left cached as if it were complete.
+        fd, tmp = tempfile.mkstemp(prefix=".uf-os-", suffix=".part", dir=dest_dir)
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                for chunk in resp.iter_content(chunk_size=1 << 20):
+                    fh.write(chunk)
+                    written += len(chunk)
+                    if on_progress and total:
+                        on_progress(min(written / total, 1.0))
+            if total and written != total:
+                raise ValueError(f"download truncated: got {written} of {total} bytes (Content-Length)")
+            os.replace(tmp, dest)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
         on_line(f"[os] downloaded {written} bytes -> {dest}")
         return dest
     raise ValueError("too many redirects fetching the OS file")
