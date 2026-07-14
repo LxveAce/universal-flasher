@@ -17,10 +17,12 @@ from dataclasses import dataclass
 
 _MAC = r"[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}"
 
-# scanap stream line — only strip a *trailing* "Beacon: <n>" stat, so an SSID that merely
-# contains the word "Beacon:" is not truncated.
+# scanap stream line — only strip a genuine *trailing* "Beacon: <n>" stat (the firmware ends the
+# line right after the integer, via println("... Beacon: " + beacon_frames)), so an SSID that merely
+# CONTAINS "Beacon: <digit>" mid-string (e.g. "xfinity Beacon: 5 area") is preserved: the trailing
+# group requires the number to be the final token (\d+\s*$), which a mid-string occurrence isn't.
 _SCAN_RE = re.compile(
-    r"RSSI:\s*(-?\d+)\s+Ch:\s*(\d+)\s+BSSID:\s*(" + _MAC + r")\s+ESSID:\s*(.*?)(?:\s+Beacon:\s*\d.*)?$"
+    r"RSSI:\s*(-?\d+)\s+Ch:\s*(\d+)\s+BSSID:\s*(" + _MAC + r")\s+ESSID:\s*(.*?)(?:\s+Beacon:\s*\d+\s*)?$"
 )
 # list -a / list -c dump line:  [0][CH:5] <name or mac> -54
 _LIST_RE = re.compile(r"^\s*\[(\d+)\]\[CH:\s*(\d+)\]\s+(.*?)\s+(-?\d+)\s*$")
@@ -81,17 +83,22 @@ class MarauderParser:
         if not line:
             return (None, None)
 
-        # note which list is being dumped (works for our ">> list -c" echo and the
-        # device's "> #list -c" echo) so the indexed rows route correctly
-        k = _list_kind_of(line)
-        if k:
-            self._list_kind = k
+        # An indexed list-dump DATA ROW matches _LIST_RE; an echoed command line does not.
+        m = _LIST_RE.match(line)
+
+        # Note which list is being dumped, but ONLY from an echoed command line (">> list -c" /
+        # "> #list -c") — never from an indexed data row. A data row whose captured name/SSID merely
+        # contains "list -c" must NOT flip the routing (an attacker AP named `list -c` would else
+        # misroute that row + every subsequent row in the dump into the wrong table).
+        if not m:
+            k = _list_kind_of(line)
+            if k:
+                self._list_kind = k
 
         if _is_tag(line):
             return (None, None)
 
         # indexed list dump — route by the active list kind
-        m = _LIST_RE.match(line)
         if m:
             idx, ch, name, rssi = m.groups()
             idx = int(idx)

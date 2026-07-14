@@ -19,6 +19,11 @@ except Exception:
 
 Line = Callable[[str], None]
 
+# Upper bound on an un-terminated read buffer. A well-behaved device emits newline-terminated lines;
+# one streaming bytes with no '\n' (garbage / wrong baud / hostile firmware) must not grow the buffer
+# without bound — flush the oversized partial line and reset. (Parity with MarauderController.)
+_MAX_LINE_BYTES = 64 * 1024
+
 
 @dataclass
 class DeviceStatus:
@@ -112,6 +117,11 @@ class GenericSerialController:
                 while b"\n" in buf:
                     line, buf = buf.split(b"\n", 1)
                     self._emit(line.decode("utf-8", "replace").rstrip("\r"))
+                # Never let a newline-less stream grow the buffer without bound: flush the oversized
+                # partial line and reset so a missing terminator can't exhaust memory.
+                if len(buf) > _MAX_LINE_BYTES:
+                    self._emit(buf.decode("utf-8", "replace").rstrip("\r"))
+                    buf = b""
 
     def send(self, command: str):
         if not command or not command.strip():

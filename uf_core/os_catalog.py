@@ -396,7 +396,16 @@ def flash_os_image(entry: OSImage, resolved: Resolved, image_path: str, device: 
             if sums_ok is False:
                 raise ValueError("SHA256SUMS signature is NOT valid for the expected key — refusing.")
         expected = resolved.sha256
-        if not expected and checksums_path and os.path.isfile(checksums_path):
+        # Bind the ENFORCED hash to the GPG-VERIFIED SHA256SUMS, not the (unverified) resolve-time
+        # fetch that populated resolved.sha256 — otherwise the signature is verified and its content
+        # discarded, and an attacker who influenced only the resolve-time SHA256SUMS GET could serve
+        # H_evil (matched by a malicious image) and defeat the checksums_sig trust model entirely.
+        if sums_ok is True and checksums_path and os.path.isfile(checksums_path):
+            with open(checksums_path, "r", encoding="utf-8", errors="replace") as fh:
+                signed = parse_sha256sums(fh.read(), os.path.basename(image_path))
+            if signed:
+                expected = signed
+        elif not expected and checksums_path and os.path.isfile(checksums_path):
             with open(checksums_path, "r", encoding="utf-8", errors="replace") as fh:
                 expected = parse_sha256sums(fh.read(), os.path.basename(image_path))
         if expected:

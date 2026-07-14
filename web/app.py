@@ -162,6 +162,15 @@ def on_ws_disconnect():
 @socketio.on("connect_serial")
 def on_connect_serial(data):
     global ctrl
+    # A flash/erase/detect owns the shared serial port while it runs (esptool needs it exclusively);
+    # opening a live serial session now would collide on that port. Refuse until the op finishes —
+    # unlike the esptool entrypoints this doesn't CLAIM the busy flag (a session is long-lived and
+    # would block all flashes), it just declines while one is in progress.
+    with _flash_lock:
+        if _flash_busy:
+            emit("status", {"connected": False,
+                            "error": "A flash/erase is in progress — try again when it finishes."})
+            return
     port = data.get("port") or None
     mock = data.get("mock", False)
     try:
