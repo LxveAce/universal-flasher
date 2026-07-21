@@ -147,3 +147,61 @@ def test_configure_kernel32_marshals_handle_without_overflow():
     assert h in (invalid, 0, None)
     if h not in (invalid, 0, None):
         k.CloseHandle(h)
+
+
+# ── download_image atomic-download (a mid-stream failure must not clobber a cached image) ──────────
+
+class _FakeResp:
+    """Minimal streaming requests.Response stand-in for download_image."""
+    def __init__(self, chunks, content_length, raise_after=None):
+        self._chunks = chunks
+        self.headers = {"content-length": str(content_length)} if content_length is not None else {}
+        self.is_redirect = False
+        self.is_permanent_redirect = False
+        self._raise_after = raise_after
+
+    def raise_for_status(self):
+        pass
+
+    def iter_content(self, chunk_size=None):
+        for i, c in enumerate(self._chunks):
+            if self._raise_after is not None and i == self._raise_after:
+                raise OSError("simulated dropped connection mid-download")
+            yield c
+
+
+_IMG_URL = "https://github.com/o/r/releases/download/v1/test.img"
+
+
+def _no_temp_left(dest_dir):
+    import os
+    return not any(n.endswith(".part") or n.startswith(".uf-img-") for n in os.listdir(dest_dir))
+
+
+def test_download_image_mid_stream_failure_keeps_cached_file(tmp_path, monkeypatch):
+    # A prior GOOD cached image must survive a dropped-connection re-download — never truncated to a
+    # partial that a later flash could then write to an SD card.
+    dest = tmp_path / "test.img"
+    dest.write_bytes(b"GOOD-CACHED-IMAGE")
+    monkeypatch.setattr(sd.requests, "get", lambda *a, **k: _FakeResp([b"AAAA", b"BBBB"], 8, raise_after=1))
+    with pytest.raises(OSError):
+        sd.download_image(_IMG_URL, str(tmp_path), _noline)
+    assert dest.read_bytes() == b"GOOD-CACHED-IMAGE"   # untouched
+    assert _no_temp_left(str(tmp_path))                 # no partial temp left behind
+
+
+def test_download_image_short_read_rejected(tmp_path, monkeypatch):
+    # Content-Length claims 100 but only 8 bytes arrive (silent truncation) -> reject, cache nothing.
+    monkeypatch.setattr(sd.requests, "get", lambda *a, **k: _FakeResp([b"AAAA", b"BBBB"], 100))
+    with pytest.raises(ValueError, match="truncated"):
+        sd.download_image(_IMG_URL, str(tmp_path), _noline)
+    assert not (tmp_path / "test.img").exists()
+    assert _no_temp_left(str(tmp_path))
+
+
+def test_download_image_happy_path_writes_complete_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(sd.requests, "get", lambda *a, **k: _FakeResp([b"AAAA", b"BBBB"], 8))
+    out = sd.download_image(_IMG_URL, str(tmp_path), _noline)
+    assert out == str(tmp_path / "test.img")
+    assert (tmp_path / "test.img").read_bytes() == b"AAAABBBB"
+    assert _no_temp_left(str(tmp_path))
