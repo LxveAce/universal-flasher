@@ -205,3 +205,39 @@ def test_download_image_happy_path_writes_complete_file(tmp_path, monkeypatch):
     assert out == str(tmp_path / "test.img")
     assert (tmp_path / "test.img").read_bytes() == b"AAAABBBB"
     assert _no_temp_left(str(tmp_path))
+
+
+# ── _detect_sd_windows: the OS/fixed-disk write guard on the SHIPPING platform (a miss wipes C:) ──
+
+def test_detect_sd_windows_wipe_guard(monkeypatch):
+    # This filter is the only thing keeping the OS/fixed disk off the raw-write target list on Windows.
+    # Assert each guard: IsSystem/IsBoot dropped, a non-removable bus dropped, a >=256GB disk dropped, a
+    # normal USB/SD card kept.
+    import json as _json
+    disks = [
+        {"Number": 0, "FriendlyName": "OS SSD",    "Size": 500 * 10**9, "BusType": "USB",  "IsSystem": True,  "IsBoot": False, "IsOffline": False},
+        {"Number": 1, "FriendlyName": "Boot disk", "Size": 240 * 10**9, "BusType": "USB",  "IsSystem": False, "IsBoot": True,  "IsOffline": False},
+        {"Number": 2, "FriendlyName": "SCSI disk", "Size": 16 * 10**9,  "BusType": "SCSI", "IsSystem": False, "IsBoot": False, "IsOffline": False},
+        {"Number": 3, "FriendlyName": "Big USB",   "Size": 512 * 10**9, "BusType": "USB",  "IsSystem": False, "IsBoot": False, "IsOffline": False},
+        {"Number": 4, "FriendlyName": "USB card",  "Size": 16 * 10**9,  "BusType": "USB",  "IsSystem": False, "IsBoot": False, "IsOffline": False},
+        {"Number": 5, "FriendlyName": "SD card",   "Size": 32 * 10**9,  "BusType": "SD",   "IsSystem": False, "IsBoot": False, "IsOffline": False},
+    ]
+    monkeypatch.setattr(sd.subprocess, "run", lambda *a, **k: _FakeRun(_json.dumps(disks)))
+    devs = [c["device"] for c in sd._detect_sd_windows(_noline)]
+    assert r"\\.\PhysicalDrive4" in devs   # small removable USB card — offered
+    assert r"\\.\PhysicalDrive5" in devs   # SD card — offered
+    assert r"\\.\PhysicalDrive0" not in devs   # IsSystem — never a target
+    assert r"\\.\PhysicalDrive1" not in devs   # IsBoot — never a target
+    assert r"\\.\PhysicalDrive2" not in devs   # non-removable bus (SCSI)
+    assert r"\\.\PhysicalDrive3" not in devs   # >= 256GB sanity cap
+    assert len(devs) == 2
+
+
+def test_detect_sd_windows_single_disk_dict(monkeypatch):
+    # ConvertTo-Json emits a bare object (not a list) for a single disk — the filter must still handle it.
+    import json as _json
+    disk = {"Number": 7, "FriendlyName": "Lone SD", "Size": 8 * 10**9, "BusType": "SD",
+            "IsSystem": False, "IsBoot": False, "IsOffline": False}
+    monkeypatch.setattr(sd.subprocess, "run", lambda *a, **k: _FakeRun(_json.dumps(disk)))
+    devs = [c["device"] for c in sd._detect_sd_windows(_noline)]
+    assert devs == [r"\\.\PhysicalDrive7"]
