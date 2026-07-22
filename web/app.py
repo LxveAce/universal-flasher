@@ -53,6 +53,18 @@ def _is_public_bind(host: str) -> bool:
     return (host or "").strip().lower() not in _LOOPBACK_HOSTS
 
 
+def _cors_origins(host: str, web_port: int):
+    """The Socket.IO CORS allow-list for a given bind.
+
+    Public bind → ``"*"``: a LAN client reaches the server by the machine's real IP/hostname, not the
+    bind address (``0.0.0.0`` is never a browsable Origin), so a fixed allow-list would CORS-reject
+    every real client and public-bind mode wouldn't work at all. The per-run auth token required on the
+    WebSocket connect is the real gate, not CORS. Loopback → the strict localhost allow-list."""
+    if _is_public_bind(host):
+        return "*"
+    return [f"http://127.0.0.1:{web_port}", f"http://localhost:{web_port}"]
+
+
 def _on_line(line: str):
     global _snapshot_counter
     parser.feed(line)
@@ -586,8 +598,7 @@ def main():
         print("      token is served to whoever loads the page. Only do this on a trusted network;")
         print("      use the default --host 127.0.0.1 to stay local-only.\n")
 
-    origin = f"http://{args.host}:{args.web_port}"
-    socketio.cors_allowed_origins = [origin, f"http://127.0.0.1:{args.web_port}", f"http://localhost:{args.web_port}"]
+    socketio.cors_allowed_origins = _cors_origins(args.host, args.web_port)
     socketio.run(app, host=args.host, port=args.web_port, debug=False,
                  allow_unsafe_werkzeug=True)
 
