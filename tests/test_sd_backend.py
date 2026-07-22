@@ -5,6 +5,8 @@ Covers the removable-drive write gate (_validate_write_target), the write_image 
 never performs a real SD write. These mirror the equivalent guards in the sister cyber-controller backend.
 """
 
+from pathlib import Path
+
 import pytest
 
 sd = pytest.importorskip("uf_core.sd_backend")
@@ -12,6 +14,26 @@ sd = pytest.importorskip("uf_core.sd_backend")
 
 def _noline(_l):
     pass
+
+
+def test_pi_image_path_has_no_front_end_consumer():
+    """The Pi-image SD profiles (PI_IMAGE_PROFILES / flash_sd / list_pi_profiles / get_pi_profile) are
+    backend scaffolding with no UI/web/CLI consumer yet — the README lists them as "planned, not yet
+    wired". If a front-end starts calling them, this fails so the code and the README's reachability
+    claim get fixed together: wire it end-to-end AND drop the "planned" note, or don't ship the caller."""
+    root = Path(__file__).resolve().parent.parent
+    front_ends = ["gui_qt/software_tab.py", "gui_qt/app.py", "gui/app.py", "tui/app.py", "web/app.py"]
+    symbols = ("flash_sd(", "list_pi_profiles(", "get_pi_profile(", "PI_IMAGE_PROFILES")
+    hits = []
+    for rel in front_ends:
+        p = root / rel
+        if not p.is_file():
+            continue
+        text = p.read_text(encoding="utf-8")
+        hits += [f"{rel}: {s}" for s in symbols if s in text]
+    assert not hits, (
+        "A front-end now references the Pi-image path — wire it end-to-end and drop the README's "
+        "'planned, not yet wired' note (or remove the caller): " + ", ".join(hits))
 
 
 # ── _validate_write_target (the removable-drive write gate) ────────────────

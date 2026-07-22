@@ -6,7 +6,7 @@
 
 ### One app to flash security hardware — firmware and full operating systems.
 
-Flash ESP32, Raspberry Pi, Flipper Zero, and ADB gear from one screen, then write a bootable Kali/Tails/Arch USB from the same tool.
+Flash ESP32, Flipper Zero, and ADB gear from one screen, then write a bootable Kali/Tails/Arch USB from the same tool.
 
 [![Release](https://img.shields.io/github/v/release/LxveAce/universal-flasher?style=for-the-badge)](https://github.com/LxveAce/universal-flasher/releases)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f?style=for-the-badge)](https://github.com/LxveAce/universal-flasher/releases)
@@ -74,7 +74,11 @@ Each profile knows its target boards, image layout (a merged blob vs. a multi-fi
 
 Chip detection is automatic across the ESP32 family (ESP32, S2, S3, C3, C5, C6, H2), and each profile picks the right release asset for the chip it finds.
 
-### Raspberry Pi (SD image writer)
+### Raspberry Pi (SD image writer) — planned, not yet wired
+
+These image profiles live in the backend (`uf_core/sd_backend.py`) but aren't reachable from any UI yet.
+The working SD/USB image path today is the verified **OS images** below (Kali / Tails / Arch → USB); wiring
+these Pi targets to a front-end is on the roadmap.
 
 | Firmware | Repo | Board |
 |----------|------|-------|
@@ -141,7 +145,7 @@ All four share the same `uf_core` library and the full firmware profile list. Th
 | Backend | Devices | How |
 |---------|---------|-----|
 | **esptool** | Every ESP32 variant | Writes firmware bins at chip-appropriate offsets, with chip auto-detection |
-| **SD image writer** | Pwnagotchi, RaspyJack, Kali ARM, OS images | Downloads `.img.xz`/`.img.gz`, decompresses, block-writes to a removable drive |
+| **SD image writer** | OS images (Kali / Tails / Arch → USB) | Downloads the image, decompresses if needed, block-writes it to a removable drive. (Pi image profiles are scaffolded but not yet UI-wired — see above.) |
 | **ADB** | RayHunter (Orbic RC400L) | ADB push + shell install, port forward, status check |
 | **qFlipper** | Flipper Zero | Launches qFlipper with the downloaded firmware package |
 
