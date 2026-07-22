@@ -2,7 +2,7 @@
 
 > **Git tags / GitHub releases:** only **v1.1.0**, **v1.1.1**, and **v1.4.0** are tagged.
 > The version headings below without a `[bracketed]` link (1.0.0, 1.0.1, 1.2.0, 1.3.0, 1.3.1)
-> record development milestones that were folded into those tagged releases — they were never
+> record development milestones that were folded into those tagged releases. They were never
 > cut as standalone git tags. Retro-tagging any of them is an owner decision.
 
 ## [Unreleased]

@@ -4,7 +4,7 @@
 
 # Universal Flasher
 
-### One app to flash security hardware — firmware and full operating systems.
+### One app to flash security hardware: firmware and full operating systems.
 
 Flash ESP32, Flipper Zero, and ADB gear from one screen, then write a bootable Kali/Tails/Arch USB from the same tool.
 
@@ -22,23 +22,23 @@ Flash ESP32, Flipper Zero, and ADB gear from one screen, then write a bootable K
 
 > ⚠️ **Authorized, lawful use only.** This is a security-research tool. Use it only on devices you own or have explicit permission to test. Provided as-is, no warranty, you assume all risk. See [DISCLAIMER.md](DISCLAIMER.md).
 
-Every board in a cyberdeck seems to need its own flashing ritual — esptool on the command line for one, the Arduino IDE for another, Raspberry Pi Imager for the SD cards, qFlipper for the Flipper, ADB commands for the hotspot. Universal Flasher folds all of that into a single app: pick the device, pick the firmware, hit flash. As of v1.4.0 it does the same thing for whole operating systems, writing verified Kali, Tails, and Arch images to a USB stick.
+Every board in a cyberdeck seems to need its own flashing ritual: esptool on the command line for one, the Arduino IDE for another, Raspberry Pi Imager for the SD cards, qFlipper for the Flipper, ADB commands for the hotspot. Universal Flasher folds all of that into a single app: pick the device, pick the firmware, hit flash. As of v1.4.0 it does the same thing for whole operating systems, writing verified Kali, Tails, and Arch images to a USB stick.
 
-It's the standalone flasher in this lineage. The full all-in-one cyberdeck controller — live device control, capture logging, lawful wardriving, and an access gate — lives in the flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)**. Universal Flasher keeps the console and AP/station tables it inherited from its Headless Marauder GUI roots so you can open a board and confirm it came up right after a flash, and it leaves the heavy control tooling to cyber-controller. This repo stays focused on flashing and provisioning, and it runs fine on its own.
+It's the standalone flasher in this lineage. The full all-in-one cyberdeck controller (live device control, capture logging, lawful wardriving, and an access gate) lives in the flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)**. Universal Flasher keeps the console and AP/station tables it inherited from its Headless Marauder GUI roots so you can open a board and confirm it came up right after a flash, and it leaves the heavy control tooling to cyber-controller. This repo stays focused on flashing and provisioning, and it runs fine on its own.
 
 <!-- STATUS-ROADMAP:START -->
 ## Status & roadmap
 
-**Latest release:** v1.4.0 (see the badge above — it tracks the real tag). Beta, actively shipping. The four front-ends run on Python 3.9+, and both CI pipelines (test + build-release) are green.
+**Latest release:** v1.4.0 (see the badge above; it tracks the real tag). Beta, actively shipping. The four front-ends run on Python 3.9+, and both CI pipelines (test + build-release) are green.
 
 **Shipped in v1.4.0:**
-- **Software-OS flashing** — write full, bootable operating systems to USB: Kali, Tails, and Arch. Each image is integrity-checked (SHA-256 + OpenPGP signature) before a single byte is written, reusing the same removable-only writer the SD-card path uses. Available from the Qt front end as a tab and on the CLI: `universal-flasher-qt --list-os` / `--flash-os`.
-- **Auto-updating OS catalog** — a weekly CI job refreshes the bundled versions and checksums; the latest release auto-resolves from the official source, and everything still works fully **offline** from the cached catalog and any images you've already pulled.
+- **Software-OS flashing.** Write full, bootable operating systems to USB: Kali, Tails, and Arch. Each image is integrity-checked (SHA-256 + OpenPGP signature) before a single byte is written, reusing the same removable-only writer the SD-card path uses. Available from the Qt front end as a tab and on the CLI: `universal-flasher-qt --list-os` / `--flash-os`.
+- **Auto-updating OS catalog.** A weekly CI job refreshes the bundled versions and checksums. The latest release auto-resolves from the official source, and everything still works fully offline from the cached catalog and any images you've already pulled.
 
 **Open items:**
-- A final on-hardware ESP32 flash test of the *prebuilt binaries* is still pending (owner/hardware-gated). The frozen-binary flash path is already fixed — multi-call esptool dispatch plus bundled esptool data since v1.3.1 — and source / `pip install` runs are flash-verified. This is the last on-device confirmation of the packaged build.
-- Flasher consolidation — share one canonical flash engine with cyber-controller so new firmware is a drop-in JSON on both sides.
-- Keep hardening the web UI and download paths as new firmware sources get added (the allowlist / redirect / path-traversal / WebSocket-token controls already ship — see [Security](#security)).
+- A final on-hardware ESP32 flash test of the *prebuilt binaries* is still pending (owner/hardware-gated). The frozen-binary flash path is already fixed (multi-call esptool dispatch plus bundled esptool data since v1.3.1), and source / `pip install` runs are flash-verified. This is the last on-device confirmation of the packaged build.
+- Flasher consolidation: share one canonical flash engine with cyber-controller so new firmware is a drop-in JSON on both sides.
+- Keep hardening the web UI and download paths as new firmware sources get added (the allowlist / redirect / path-traversal / WebSocket-token controls already ship; see [Security](#security)).
 <!-- STATUS-ROADMAP:END -->
 
 ---
@@ -74,7 +74,7 @@ Each profile knows its target boards, image layout (a merged blob vs. a multi-fi
 
 Chip detection is automatic across the ESP32 family (ESP32, S2, S3, C3, C5, C6, H2), and each profile picks the right release asset for the chip it finds.
 
-### Raspberry Pi (SD image writer) — planned, not yet wired
+### Raspberry Pi (SD image writer): planned, not yet wired
 
 These image profiles live in the backend (`uf_core/sd_backend.py`) but aren't reachable from any UI yet.
 The working SD/USB image path today is the verified **OS images** below (Kali / Tails / Arch → USB); wiring
@@ -117,7 +117,7 @@ Drop a `.json` profile into `~/.universal-flasher/plugins/` (or `%LOCALAPPDATA%\
 }
 ```
 
-`flash_method` currently has to be `esptool` — qflipper/dfu/uf2 plugin dispatch isn't wired yet, so a plugin declaring one of those is rejected with a clear message instead of being silently flashed with esptool. `image_model` is `merged` or `multi`. Required fields: `id`, `label`, `repo`, `flash_method`, `supported_chips`.
+`flash_method` currently has to be `esptool`; qflipper/dfu/uf2 plugin dispatch isn't wired yet, so a plugin declaring one of those is rejected with a clear message instead of being silently flashed with esptool. `image_model` is `merged` or `multi`. Required fields: `id`, `label`, `repo`, `flash_method`, `supported_chips`.
 
 ## Supported OS images
 
@@ -138,14 +138,14 @@ The latest version auto-resolves from the official source, the bundled catalog w
 | **Textual** (terminal) | `python tui/app.py` | SSH sessions, headless Kali, no X11 |
 | **Flask** (browser) | `python web/app.py` | Local access at `http://localhost:5000` |
 
-All four share the same `uf_core` library and the full firmware profile list. The Software-OS flow (Kali/Tails/Arch to USB) is wired into the Qt front end — the tab plus `universal-flasher-qt --list-os` / `--flash-os`. After a `pip install` the entry points are also available as console scripts: `universal-flasher-qt`, `universal-flasher-tk`, `universal-flasher-tui`, `universal-flasher-web`.
+All four share the same `uf_core` library and the full firmware profile list. The Software-OS flow (Kali/Tails/Arch to USB) is wired into the Qt front end: the tab plus `universal-flasher-qt --list-os` / `--flash-os`. After a `pip install` the entry points are also available as console scripts: `universal-flasher-qt`, `universal-flasher-tk`, `universal-flasher-tui`, `universal-flasher-web`.
 
 ## Flash backends
 
 | Backend | Devices | How |
 |---------|---------|-----|
 | **esptool** | Every ESP32 variant | Writes firmware bins at chip-appropriate offsets, with chip auto-detection |
-| **SD image writer** | OS images (Kali / Tails / Arch → USB) | Downloads the image, decompresses if needed, block-writes it to a removable drive. (Pi image profiles are scaffolded but not yet UI-wired — see above.) |
+| **SD image writer** | OS images (Kali / Tails / Arch → USB) | Downloads the image, decompresses if needed, block-writes it to a removable drive. (Pi image profiles are scaffolded but not yet UI-wired; see above.) |
 | **ADB** | RayHunter (Orbic RC400L) | ADB push + shell install, port forward, status check |
 | **qFlipper** | Flipper Zero | Launches qFlipper with the downloaded firmware package |
 
@@ -153,30 +153,30 @@ All four share the same `uf_core` library and the full firmware profile list. Th
 
 Beyond the raw flash, the flasher covers the surrounding grind:
 
-- **Know what's plugged in** — USB VID/PID identification, a serial version probe (single- or multi-baud), a port scanner that tells you what's on each port, and a JSON manifest of every connected device.
-- **Full flash or app-only** — blank-board setup or a firmware update, whichever you need.
-- **Backup and restore** — dump the whole flash before you write (esptool `read_flash`), and restore it later with verify. Each backup stores its chip, port, timestamp, and SHA-256.
-- **Post-flash health check** — watches the serial boot for a good boot signature, and catches guru-meditation, asserts, panics, and backtraces so you know if a board came up wrong.
-- **Batch flash** — sequential or parallel, with a pre-built cyberdeck plan that assigns firmware across a multi-board deck and per-device pass/fail/duration tracking.
-- **Offline cache** — pre-download every profile's latest release to `~/.universal-flasher/cache/<profile>/<tag>/<asset>` for field work with no internet.
-- **Flash history** — a persistent log of every flash (timestamp, version, result) and what was last written to each port, auto-pruned.
-- **Update checker** — one call scans every profile for new upstream releases, rate-limited and cached so it doesn't hammer GitHub.
-- **Suicide-build support** — flash pre-provisioned, SHA256-verified anti-forensic Marauder bundles, with a TOCTOU defense that stages verified files to a private tempdir before esptool runs. See [`suicide/docs/SAFETY.md`](suicide/docs/SAFETY.md).
+- **Know what's plugged in**: USB VID/PID identification, a serial version probe (single- or multi-baud), a port scanner that tells you what's on each port, and a JSON manifest of every connected device.
+- **Full flash or app-only**: blank-board setup or a firmware update, whichever you need.
+- **Backup and restore**: dump the whole flash before you write (esptool `read_flash`), and restore it later with verify. Each backup stores its chip, port, timestamp, and SHA-256.
+- **Post-flash health check**: watches the serial boot for a good boot signature, and catches guru-meditation, asserts, panics, and backtraces so you know if a board came up wrong.
+- **Batch flash**: sequential or parallel, with a pre-built cyberdeck plan that assigns firmware across a multi-board deck and per-device pass/fail/duration tracking.
+- **Offline cache**: pre-download every profile's latest release to `~/.universal-flasher/cache/<profile>/<tag>/<asset>` for field work with no internet.
+- **Flash history**: a persistent log of every flash (timestamp, version, result) and what was last written to each port, auto-pruned.
+- **Update checker**: one call scans every profile for new upstream releases, rate-limited and cached so it doesn't hammer GitHub.
+- **Suicide-build support**: flash pre-provisioned, SHA256-verified anti-forensic Marauder bundles, with a TOCTOU defense that stages verified files to a private tempdir before esptool runs. See [`suicide/docs/SAFETY.md`](suicide/docs/SAFETY.md).
 
-The desktop UIs also carry a serial **console** and live **AP/station tables** for checking a board after you flash it. That's a leftover from the Headless Marauder GUI lineage, not the point of the app — reach for [cyber-controller](https://github.com/LxveAce/cyber-controller) when you want the full controller, logger, and wardriving suite.
+The desktop UIs also carry a serial console and live AP/station tables for checking a board after you flash it. That's a leftover from the Headless Marauder GUI lineage, not the point of the app. Reach for [cyber-controller](https://github.com/LxveAce/cyber-controller) when you want the full controller, logger, and wardriving suite.
 
 ## Security
 
-- **HTTPS-only downloads** — everything is fetched over TLS.
-- **Host allowlist** — downloads are restricted to known release/raw infrastructure (GitHub, `kali.download`, and the OS sources above).
-- **Redirect hardening** — HTTP redirects are checked against the same allowlist *before* they're followed, with a redirect-loop cap.
-- **Path-traversal protection** — every downloaded filename is validated as a safe basename, and bundle extraction rejects any entry that resolves outside the target directory.
-- **SHA-256 integrity** — suicide bundles and OS images are verified before flashing; backups are hashed.
-- **TOCTOU defense** — verified firmware is staged to a private tempdir before esptool touches it.
-- **SD-card safety** — block writes go only to removable drives under a size cap, with an explicit confirmation.
-- **Web UI hardening** — the browser UI binds to loopback only, with CORS locked to `127.0.0.1:5000` and a WebSocket auth token minted at startup.
+- **HTTPS-only downloads**: everything is fetched over TLS.
+- **Host allowlist**: downloads are restricted to known release/raw infrastructure (GitHub, `kali.download`, and the OS sources above).
+- **Redirect hardening**: HTTP redirects are checked against the same allowlist *before* they're followed, with a redirect-loop cap.
+- **Path-traversal protection**: every downloaded filename is validated as a safe basename, and bundle extraction rejects any entry that resolves outside the target directory.
+- **SHA-256 integrity**: suicide bundles and OS images are verified before flashing; backups are hashed.
+- **TOCTOU defense**: verified firmware is staged to a private tempdir before esptool touches it.
+- **SD-card safety**: block writes go only to removable drives under a size cap, with an explicit confirmation.
+- **Web UI hardening**: the browser UI binds to loopback only, with CORS locked to `127.0.0.1:5000` and a WebSocket auth token minted at startup.
 
-Found a security bug? Please report it privately — see [SECURITY.md](SECURITY.md), not a public issue.
+Found a security bug? Please report it privately: see [SECURITY.md](SECURITY.md), not a public issue.
 
 ## Install
 
@@ -203,7 +203,7 @@ pip install -e ".[web]"   # Flask browser UI
 
 ### Prebuilt binaries
 
-No-Python-required builds are on the [Releases](https://github.com/LxveAce/universal-flasher/releases) page for **Windows x64**, **macOS arm64 (Apple Silicon)**, **Linux x64**, and **Linux arm64**. They're unsigned, so Windows SmartScreen and macOS Gatekeeper will warn on first run — that's expected for an unsigned build; allow it through if you trust the source.
+No-Python-required builds are on the [Releases](https://github.com/LxveAce/universal-flasher/releases) page for **Windows x64**, **macOS arm64 (Apple Silicon)**, **Linux x64**, and **Linux arm64**. They're unsigned, so Windows SmartScreen and macOS Gatekeeper will warn on first run. That's expected for an unsigned build; allow it through if you trust the source.
 
 To build one locally:
 
@@ -247,7 +247,7 @@ Convenience launchers are included for both platforms: `run-qt`, `run-gui`, `run
 
 | Project | What it is |
 |---------|------------|
-| **[cyber-controller](https://github.com/LxveAce/cyber-controller)** | The flagship. Flash + control + coordinate — the full cyberdeck controller with live device control, capture logging, lawful wardriving, and an access gate. Universal Flasher is its flashing half, spun out to run standalone. |
+| **[cyber-controller](https://github.com/LxveAce/cyber-controller)** | The flagship. Flash + control + coordinate: the full cyberdeck controller with live device control, capture logging, lawful wardriving, and an access gate. Universal Flasher is its flashing half, spun out to run standalone. |
 | **[headless-marauder-gui](https://github.com/LxveAce/headless-marauder-gui)** | The Marauder-only controller + flasher this project grew out of. It stays focused on Marauder; Universal Flasher generalized the flasher to every device. |
 
 ## Architecture
@@ -283,9 +283,9 @@ universal-flasher/
 
 ## Contributing
 
-PRs and issues are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The short version: branch off `main`, run with `--mock` to develop without hardware, and if you touch `uf_core/`, keep it working across all four UIs.
+PRs and issues are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). The short version: branch off `main`, run with `--mock` to develop without hardware, and if you touch `uf_core/`, keep it working across all four UIs.
 
-There's a hardware-free test suite (`tests/`) that CI runs on every push — flash offsets, security guards, the SD/ADB/OS backends, and headless-import safety. Run it with:
+There's a hardware-free test suite (`tests/`) that CI runs on every push: flash offsets, security guards, the SD/ADB/OS backends, and headless-import safety. Run it with:
 
 ```bash
 pip install -e ".[test]"
@@ -294,17 +294,17 @@ pytest
 
 ## Credits
 
-All firmware is downloaded straight from its upstream repositories (linked in the tables above) and written unmodified — nothing is vendored or rebuilt here. Flashing rides on [esptool](https://github.com/espressif/esptool) for ESP32 and [qFlipper](https://flipperzero.one/update) for the Flipper. The vendored Suicide-Marauder bundle is pinned and SHA-256 verified before it's ever flashed. Thanks to every firmware author who makes their work open.
+All firmware is downloaded straight from its upstream repositories (linked in the tables above) and written unmodified. Nothing is vendored or rebuilt here. Flashing rides on [esptool](https://github.com/espressif/esptool) for ESP32 and [qFlipper](https://flipperzero.one/update) for the Flipper. The vendored Suicide-Marauder bundle is pinned and SHA-256 verified before it's ever flashed. Thanks to every firmware author who makes their work open.
 
 ## Legal
 
-Universal Flasher is a flasher — it writes official, unmodified firmware and OS images to hardware. It doesn't add, enable, or modify any offensive capability, and it doesn't verify firmware *signatures*, so always check what you're flashing. You're solely responsible for complying with the laws that apply to you and to the firmware you install. See [DISCLAIMER.md](DISCLAIMER.md) and, for anti-forensic suicide builds, [`suicide/docs/SAFETY.md`](suicide/docs/SAFETY.md).
+Universal Flasher is a flasher. It writes official, unmodified firmware and OS images to hardware. It doesn't add, enable, or modify any offensive capability, and it doesn't verify firmware *signatures*, so always check what you're flashing. You're solely responsible for complying with the laws that apply to you and to the firmware you install. See [DISCLAIMER.md](DISCLAIMER.md) and, for anti-forensic suicide builds, [`suicide/docs/SAFETY.md`](suicide/docs/SAFETY.md).
 
 **For authorized security testing, research, and education only.**
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ## 📫 Connect
 

@@ -33,11 +33,11 @@ Open a [GitHub issue](https://github.com/LxveAce/universal-flasher/issues). Incl
 
 ## Code style
 
-Python 3.9+. Follow whatever patterns are already in the code — it's kept pretty straightforward on purpose. Don't over-engineer things or add dependencies for stuff the stdlib handles fine.
+Python 3.9+. Follow whatever patterns are already in the code; it's kept pretty straightforward on purpose. Don't over-engineer things or add dependencies for stuff the stdlib handles fine.
 
 ## Adding commands
 
-New Marauder commands go in `uf_core/commands.py` — add a `Command(...)` to the right category in `build()`. All four UIs pick it up automatically from there.
+New Marauder commands go in `uf_core/commands.py`. Add a `Command(...)` to the right category in `build()`. All four UIs pick it up automatically from there.
 
 ## Project layout
 
