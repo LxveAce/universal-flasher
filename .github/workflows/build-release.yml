@@ -167,3 +167,24 @@ jobs:
         with:
           name: linux-arm64
           path: dist/universal-flasher-*-linux-arm64
+
+  # After every platform build, aggregate ONE SHA256SUMS.txt over the attached binaries and add it to
+  # the release, so a download can be integrity-checked (`sha256sum -c SHA256SUMS.txt`). Runs only on a
+  # real release (nothing to sum on a dispatch build); `if: always()` so a best-effort platform build
+  # that failed doesn't skip the sums for the ones that succeeded.
+  checksums:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos, build-linux-x64, build-linux-arm64]
+    if: always() && github.event_name == 'release'
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Aggregate + upload SHA256SUMS.txt
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          mkdir dl && cd dl
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'universal-flasher-*' --clobber
+          sha256sum universal-flasher-* | sed 's/ \*/  /' > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+          cd ..
+          gh release upload "$TAG" SHA256SUMS.txt --clobber
