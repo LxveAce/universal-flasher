@@ -5,7 +5,10 @@ Covers the removable-drive write gate (_validate_write_target), the write_image 
 never performs a real SD write. These mirror the equivalent guards in the sister cyber-controller backend.
 """
 
+import ctypes
+import types
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -263,3 +266,59 @@ def test_detect_sd_windows_single_disk_dict(monkeypatch):
     monkeypatch.setattr(sd.subprocess, "run", lambda *a, **k: _FakeRun(_json.dumps(disk)))
     devs = [c["device"] for c in sd._detect_sd_windows(_noline)]
     assert devs == [r"\\.\PhysicalDrive7"]
+
+
+# ── _write_windows raw-disk write loop: abort on a failed / short WriteFile (never truncate silently) ──
+# _write_windows opens the drive with Windows-only calls (ctypes.windll + the wintypes marshalling in
+# _configure_kernel32, which has its own test above), but the write LOOP — abort on a FALSE WriteFile and
+# abort on a TRUE-but-short byte count — is platform-independent logic. Exercise it on any OS by no-op'ing
+# the Windows-only _configure_kernel32 and injecting a fake kernel32 whose WriteFile drives each mode. A
+# real card is never touched (CreateFileW is faked to a dummy handle).
+def _fake_raw_disk(monkeypatch, writefile):
+    monkeypatch.setattr(sd, "_configure_kernel32", lambda k: None)
+    k = MagicMock()
+    k.CreateFileW.return_value = 100            # a valid, non-INVALID handle
+    k.WriteFile.side_effect = writefile
+    monkeypatch.setattr(ctypes, "windll", types.SimpleNamespace(kernel32=k), raising=False)
+    monkeypatch.setattr(ctypes, "GetLastError", lambda: 5, raising=False)
+    return k
+
+
+def test_write_windows_aborts_on_writefile_failure(tmp_path, monkeypatch):
+    img = tmp_path / "x.img"
+    img.write_bytes(b"\xa5" * 300)
+    lines = []
+    _fake_raw_disk(monkeypatch, lambda *a: 0)   # WriteFile returns FALSE
+    rc = sd._write_windows(str(img), r"\\.\PhysicalDrive9", lines.append)
+    assert rc == 1                              # non-zero = the caller treats the flash as failed
+    assert any("WriteFile failed" in line for line in lines)
+
+
+def test_write_windows_aborts_on_short_write(tmp_path, monkeypatch):
+    # WriteFile returns TRUE but reports fewer bytes than requested (the end-of-media / silent-truncation
+    # case). The written counter is left at its initial 0, so value != len(data) and the writer must abort
+    # with rc 1 instead of advancing the read position and corrupting the card.
+    img = tmp_path / "x.img"
+    img.write_bytes(b"\xa5" * 300)
+    lines = []
+    _fake_raw_disk(monkeypatch, lambda *a: 1)   # TRUE, but leaves the written count at 0 (short)
+    rc = sd._write_windows(str(img), r"\\.\PhysicalDrive9", lines.append)
+    assert rc == 1
+    assert any("short write" in line for line in lines)
+
+
+def test_write_windows_full_write_succeeds(tmp_path, monkeypatch):
+    # Control: a WriteFile that reports the full byte count must NOT trip either abort guard (rc 0), so the
+    # guards above are catching real failures rather than rejecting every write.
+    img = tmp_path / "x.img"
+    img.write_bytes(b"\xa5" * 300)
+
+    def _write_full(handle, buf, length, written_ptr, overlapped):
+        written_ptr._obj.value = length         # report the whole chunk as written
+        return 1
+
+    lines = []
+    _fake_raw_disk(monkeypatch, _write_full)
+    rc = sd._write_windows(str(img), r"\\.\PhysicalDrive9", lines.append)
+    assert rc == 0
+    assert any("wrote" in line for line in lines)
