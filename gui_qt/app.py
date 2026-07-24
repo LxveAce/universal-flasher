@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Universal Flasher — PyQt5 desktop GUI.
+LxveFlasher — PyQt5 desktop GUI.
 
 Multi-firmware flasher and device manager for ESP32, Raspberry Pi, Flipper Zero, and
 ADB-based security hardware. Built on the Headless Marauder scaffold.
@@ -292,7 +292,7 @@ class FlasherDialog(QDialog):
     def __init__(self, parent, controller, default_port=""):
         super().__init__(parent)
         self.ctl = controller
-        self.setWindowTitle("Universal Flasher")
+        self.setWindowTitle("LxveFlasher")
         self.resize(780, 600)
         self.q = queue.Queue()
         self.chip = None
@@ -859,7 +859,7 @@ class MainWindow(QMainWindow):
         self._autolist_cmd = None
         self._snap_skip = 0
 
-        self.setWindowTitle("Universal Flasher")
+        self.setWindowTitle("LxveFlasher")
         self.resize(1200, 780)
         self.setStyleSheet(DARK_QSS)
         self._build()
@@ -1189,8 +1189,8 @@ class MainWindow(QMainWindow):
 
     def _about(self):
         QMessageBox.about(
-            self, "About Universal Flasher",
-            f"<b>Universal Flasher</b> v{__version__} ({updater.current_revision()})<br><br>"
+            self, "About LxveFlasher",
+            f"<b>LxveFlasher</b> v{__version__} ({updater.current_revision()})<br><br>"
             "Multi-firmware flasher and device manager for ESP32, Raspberry Pi,<br>"
             "Flipper Zero, and ADB-based security hardware.<br><br>"
             "Supports 14+ firmware profiles: Marauder, GhostESP, Bruce, HaleHound,<br>"
@@ -1297,7 +1297,7 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Universal Flasher Qt GUI")
+    ap = argparse.ArgumentParser(description="LxveFlasher Qt GUI")
     ap.add_argument("--port"); ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--no-autoconnect", action="store_true")

@@ -14,6 +14,11 @@
 - Standalone (PyInstaller) binaries now include the Software-OS flow — `uf_core.os_catalog` and `gui_qt.software_tab` are declared as hidden imports so `--list-os` / `--flash-os` work in the frozen build.
 
 **Changed:**
+- **Rebranded to LxveFlasher.** The product name is now **LxveFlasher** across the README, docs, GUI window/About titles,
+  and TUI/web headers — it's a first-class LxveLabs tool, not a dead predecessor, and the browser flasher on lxvelabs.com is
+  its web face. The package identifiers are deliberately unchanged this release (the `universal-flasher` pip name, the
+  `universal-flasher-*` launch commands, the repo URL, and the `~/.universal-flasher` config/cache/backup/plugin directories)
+  so existing installs, scripts, and saved data keep working; renaming those is a separate publishing step.
 - `requirements.txt` realigned with `pyproject.toml`'s core+extras model (dropped the misplaced `nvs` pin, which lives in `suicide/host_requirements.txt`).
 
 ## [1.4.0] — 2026-06-27

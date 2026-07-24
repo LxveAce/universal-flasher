@@ -1,4 +1,4 @@
-"""Tests for the Universal Flasher Software-OS catalog (uf_core/os_catalog.py).
+"""Tests for the LxveFlasher Software-OS catalog (uf_core/os_catalog.py).
 
 Network + the destructive device write are mocked (monkeypatch).
 """

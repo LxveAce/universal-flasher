@@ -1,5 +1,5 @@
 """
-Universal Flasher — Browser UI (localhost Flask + SocketIO).
+LxveFlasher — Browser UI (localhost Flask + SocketIO).
 
 Same core, same features, but served as a local web page at http://localhost:5000.
 Reuses uf_core (controller, commands, parsing, capture) identically to the
@@ -564,7 +564,7 @@ socketio.start_background_task(_table_pusher)
 # ── main ────────────────────────────────────────────────────────────────── #
 
 def main():
-    ap = argparse.ArgumentParser(description="Universal Flasher — Browser UI")
+    ap = argparse.ArgumentParser(description="LxveFlasher — Browser UI")
     ap.add_argument("--port", default=None, help="Serial port (auto-detect if omitted)")
     ap.add_argument("--mock", action="store_true", help="Mock mode (no hardware)")
     ap.add_argument("--host", default="127.0.0.1", help="Bind address (default: localhost only)")
@@ -587,7 +587,7 @@ def main():
         except Exception as e:
             print(f"[!] Auto-connect failed: {e}")
 
-    print(f"\n  Universal Flasher v{__version__} — Browser UI")
+    print(f"\n  LxveFlasher v{__version__} — Browser UI")
     print(f"  Open http://{args.host}:{args.web_port} in your browser")
     print(f"  Auth token: {_AUTH_TOKEN}\n")
 

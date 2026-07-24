@@ -1,5 +1,5 @@
 """
-DeviceDetect — automatic device identification for the Universal Flasher.
+DeviceDetect — automatic device identification for the LxveFlasher.
 
 Enumerates USB serial ports, identifies hardware by VID/PID, probes firmware
 version over serial, and generates a cyberdeck manifest (JSON snapshot of

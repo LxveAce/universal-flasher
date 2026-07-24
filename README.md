@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/icon.svg" alt="Universal Flasher" width="120" />
+<img src="assets/icon.svg" alt="LxveFlasher" width="120" />
 
-# Universal Flasher
+# LxveFlasher
 
 ### One app to flash security hardware: firmware and full operating systems.
 
@@ -22,9 +22,9 @@ Flash ESP32, Flipper Zero, and ADB gear from one screen, then write a bootable K
 
 > ⚠️ **Authorized, lawful use only.** This is a security-research tool. Use it only on devices you own or have explicit permission to test. Provided as-is, no warranty, you assume all risk. See [DISCLAIMER.md](DISCLAIMER.md).
 
-Every board in a cyberdeck seems to need its own flashing ritual: esptool on the command line for one, the Arduino IDE for another, Raspberry Pi Imager for the SD cards, qFlipper for the Flipper, ADB commands for the hotspot. Universal Flasher folds all of that into a single app: pick the device, pick the firmware, hit flash. As of v1.4.0 it does the same thing for whole operating systems, writing verified Kali, Tails, and Arch images to a USB stick.
+Every board in a cyberdeck seems to need its own flashing ritual: esptool on the command line for one, the Arduino IDE for another, Raspberry Pi Imager for the SD cards, qFlipper for the Flipper, ADB commands for the hotspot. LxveFlasher folds all of that into a single app: pick the device, pick the firmware, hit flash. As of v1.4.0 it does the same thing for whole operating systems, writing verified Kali, Tails, and Arch images to a USB stick.
 
-It's the standalone flasher in this lineage. The full all-in-one cyberdeck controller (live device control, capture logging, lawful wardriving, and an access gate) lives in the flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)**. Universal Flasher keeps the console and AP/station tables it inherited from its Headless Marauder GUI roots so you can open a board and confirm it came up right after a flash, and it leaves the heavy control tooling to cyber-controller. This repo stays focused on flashing and provisioning, and it runs fine on its own.
+It's the standalone flasher in this lineage. The full all-in-one cyberdeck controller (live device control, capture logging, lawful wardriving, and an access gate) lives in the flagship **[cyber-controller](https://github.com/LxveAce/cyber-controller)**. LxveFlasher keeps the console and AP/station tables it inherited from its Headless Marauder GUI roots so you can open a board and confirm it came up right after a flash, and it leaves the heavy control tooling to cyber-controller. This repo stays focused on flashing and provisioning, and it runs fine on its own.
 
 <!-- STATUS-ROADMAP:START -->
 ## Status & roadmap
@@ -247,8 +247,8 @@ Convenience launchers are included for both platforms: `run-qt`, `run-gui`, `run
 
 | Project | What it is |
 |---------|------------|
-| **[cyber-controller](https://github.com/LxveAce/cyber-controller)** | The flagship. Flash + control + coordinate: the full cyberdeck controller with live device control, capture logging, lawful wardriving, and an access gate. Universal Flasher is its flashing half, spun out to run standalone. |
-| **[headless-marauder-gui](https://github.com/LxveAce/headless-marauder-gui)** | The Marauder-only controller + flasher this project grew out of. It stays focused on Marauder; Universal Flasher generalized the flasher to every device. |
+| **[cyber-controller](https://github.com/LxveAce/cyber-controller)** | The flagship. Flash + control + coordinate: the full cyberdeck controller with live device control, capture logging, lawful wardriving, and an access gate. LxveFlasher is its flashing half, spun out to run standalone. |
+| **[headless-marauder-gui](https://github.com/LxveAce/headless-marauder-gui)** | The Marauder-only controller + flasher this project grew out of. It stays focused on Marauder; LxveFlasher generalized the flasher to every device. |
 
 ## Architecture
 
@@ -298,7 +298,7 @@ All firmware is downloaded straight from its upstream repositories (linked in th
 
 ## Legal
 
-Universal Flasher is a flasher. It writes official, unmodified firmware and OS images to hardware. It doesn't add, enable, or modify any offensive capability, and it doesn't verify firmware *signatures*, so always check what you're flashing. You're solely responsible for complying with the laws that apply to you and to the firmware you install. See [DISCLAIMER.md](DISCLAIMER.md) and, for anti-forensic suicide builds, [`suicide/docs/SAFETY.md`](suicide/docs/SAFETY.md).
+LxveFlasher is a flasher. It writes official, unmodified firmware and OS images to hardware. It doesn't add, enable, or modify any offensive capability, and it doesn't verify firmware *signatures*, so always check what you're flashing. You're solely responsible for complying with the laws that apply to you and to the firmware you install. See [DISCLAIMER.md](DISCLAIMER.md) and, for anti-forensic suicide builds, [`suicide/docs/SAFETY.md`](suicide/docs/SAFETY.md).
 
 **For authorized security testing, research, and education only.**
 

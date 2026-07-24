@@ -1,4 +1,4 @@
-"""Universal Flasher core: multi-firmware flasher, serial controllers, device
+"""LxveFlasher core: multi-firmware flasher, serial controllers, device
 detection, and management for ESP32, Raspberry Pi, Flipper Zero, and ADB-based
 security hardware. Built on the Headless Marauder scaffold."""
 

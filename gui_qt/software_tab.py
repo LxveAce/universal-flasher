@@ -1,6 +1,6 @@
 """Software-OS tab — flash bootable PC/USB operating systems (Kali / Tails / Arch / ...).
 
-Universal Flasher's "Software" side, separate from firmware: writes whole-disk OS images to a
+LxveFlasher's "Software" side, separate from firmware: writes whole-disk OS images to a
 removable USB. Drives the verified, auto-resolving catalog in :mod:`uf_core.os_catalog` (latest version
 online, bundled pinned version offline) and reuses the hardened removable-only writer. The destructive
 write happens off the UI thread; every step is logged. Tooltips on every control.

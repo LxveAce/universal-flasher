@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Universal Flasher TUI — a terminal application (Textual) for Kali Linux.
+LxveFlasher TUI — a terminal application (Textual) for Kali Linux.
 
 Runs entirely in the terminal: a command tree on the left, live serial output on
 the right, a raw command box at the bottom. Great over SSH / on a headless console.
@@ -503,7 +503,7 @@ class MarauderTUI(App):
         yield Footer()
 
     def on_mount(self):
-        self.title = "Universal Flasher TUI"
+        self.title = "LxveFlasher TUI"
         tree = self.query_one("#tree", Tree)
         tree.root.expand()
         for cat in commands.categories():
@@ -637,7 +637,7 @@ class MarauderTUI(App):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Universal Flasher TUI (terminal app)")
+    ap = argparse.ArgumentParser(description="LxveFlasher TUI (terminal app)")
     ap.add_argument("--port", help="Serial port (default: auto-detect)")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--mock", action="store_true", help="Run without hardware")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build standalone executables for Universal Flasher using PyInstaller.
+Build standalone executables for LxveFlasher using PyInstaller.
 
 Usage:
     pip install pyinstaller

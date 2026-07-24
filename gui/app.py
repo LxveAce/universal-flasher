@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Universal Flasher GUI — a native Tkinter desktop application for Kali Linux.
+LxveFlasher GUI — a native Tkinter desktop application for Kali Linux.
 
 A real window (no browser, no web server): categorized buttons for every Marauder
 serial command, parameter dialogs, a live console, a raw command box, and a big STOP.
@@ -153,7 +153,7 @@ class MarauderGUI(tk.Tk):
         self._poll_id = None
         self._closing = False
 
-        self.title("Universal Flasher GUI")
+        self.title("LxveFlasher GUI")
         self.geometry("1100x720")
         self.configure(bg=BG)
         self._build_style()
@@ -399,7 +399,7 @@ class MarauderGUI(tk.Tk):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Universal Flasher GUI (Tkinter desktop app)")
+    ap = argparse.ArgumentParser(description="LxveFlasher GUI (Tkinter desktop app)")
     ap.add_argument("--port", help="Serial port (e.g. /dev/ttyUSB0). Default: auto-detect")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--mock", action="store_true", help="Run without hardware")

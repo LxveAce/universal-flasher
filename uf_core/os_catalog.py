@@ -1,7 +1,7 @@
 """Software-OS flashing catalog: write bootable PC/USB operating systems to a USB stick.
 
-Universal Flasher's "Software" side (parallel to firmware): flash whole-disk OS images (Tails, Kali,
-Arch, ...) to a removable USB. Self-contained (Universal Flasher has no tails.py): this module owns the
+LxveFlasher's "Software" side (parallel to firmware): flash whole-disk OS images (Tails, Kali,
+Arch, ...) to a removable USB. Self-contained (LxveFlasher has no tails.py): this module owns the
 catalog, the latest-version resolvers, and the verification chain, and reuses the hardened removable-
 only writer in :mod:`uf_core.sd_backend` for the destructive device write.
 
@@ -453,7 +453,7 @@ def flash_os_image(entry: OSImage, resolved: Resolved, image_path: str, device: 
 # ── CLI surfaces ─────────────────────────────────────────────────────
 
 def list_catalog_cli() -> int:
-    print("=== Universal Flasher — Software OS catalog (flash to USB) ===")
+    print("=== LxveFlasher — Software OS catalog (flash to USB) ===")
     for i in load_catalog():
         print(f"  {i.id:<8} {i.name:<22} [{i.category}] ({i.image_type})")
         print(f"           {i.description}")
@@ -476,7 +476,7 @@ def run_os_flash_cli(image_id: str, target: Optional[str] = None, image: Optiona
         print(f"Unknown OS id {image_id!r}. Available: {avail}", file=sys.stderr)
         return 2
 
-    print(f"=== Universal Flasher — flash {entry.name} to USB ===")
+    print(f"=== LxveFlasher — flash {entry.name} to USB ===")
     print("Writes a verified bootable OS image to a removable USB. The ENTIRE target USB is erased.\n")
 
     resolved = resolve(entry, on, online=not offline)

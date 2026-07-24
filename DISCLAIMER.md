@@ -1,6 +1,6 @@
 # Disclaimer & Acceptable Use
 
-**Universal Flasher** is a security-research tool, provided for **authorized, lawful use only**.
+**LxveFlasher** is a security-research tool, provided for **authorized, lawful use only**.
 
 ## Authorized & lawful use only
 Use this only on devices, networks, and systems you **own** or have **explicit permission** to test. Many things security tooling like this can do — deauthentication, evil portals, beacon/BLE spam, RF transmission, packet capture, wardriving, anti-forensic wiping, and the like — are **illegal when aimed at people, devices, or networks you don't own or aren't authorized to test**. Laws including the U.S. Computer Fraud and Abuse Act (CFAA), the UK Computer Misuse Act, the FCC prohibition on willful interference (47 U.S.C. §333), and their equivalents worldwide may apply. **Know what's legal where you are before you start.**
