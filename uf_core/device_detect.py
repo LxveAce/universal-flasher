@@ -5,6 +5,11 @@ Enumerates USB serial ports, identifies hardware by VID/PID, probes firmware
 version over serial, and generates a cyberdeck manifest (JSON snapshot of
 everything connected). Pure Python + pyserial.
 """
+# Defer annotation evaluation so `ser: serial.Serial` (line ~131) is never evaluated at import.
+# pyserial is optional (imported under try/except below); without this, importing the module on a
+# pyserial-less runner — e.g. the scheduled "Update OS catalog" job, which installs only requests —
+# raises NameError: name 'serial' is not defined, which reddened that job.
+from __future__ import annotations
 
 import json
 import re
