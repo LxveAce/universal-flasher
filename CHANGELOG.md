@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-08-08
+
 **Fixed:**
 - ESP32-C5 second-stage bootloader offset is `0x2000`, not `0x0` — writing the bootloader at 0x0 bricks a C5.
 - `send_and_capture` no longer loses output when the serial ring buffer fills during a long-running capture.
@@ -138,6 +140,8 @@ Initial release.
 
 <!-- Only the three git-tagged releases are linked; the other headings above are
      never-tagged development milestones (see the note at the top of this file). -->
+[Unreleased]: https://github.com/LxveAce/universal-flasher/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.4.1
 [1.4.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.4.0
 [1.1.1]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.1.1
 [1.1.0]: https://github.com/LxveAce/universal-flasher/releases/tag/v1.1.0
