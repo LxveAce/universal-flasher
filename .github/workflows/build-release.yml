@@ -187,4 +187,4 @@ jobs:
           sha256sum universal-flasher-* | sed 's/ \*/  /' > ../SHA256SUMS.txt
           cat ../SHA256SUMS.txt
           cd ..
-          gh release upload "$TAG" SHA256SUMS.txt --clobber
+          gh release upload "$TAG" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
