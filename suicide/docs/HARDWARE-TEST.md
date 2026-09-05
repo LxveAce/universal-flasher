@@ -15,7 +15,7 @@ First real-silicon validation of the boot gate. **SAFE_MODE only — nothing was
 - A throwaway **SAFE_MODE serial harness** that links the real `firmware/bootgate/*` units
   (`GateConfig`, `GateCrypto`, `ArmingSwitch`, `SelfDestruct`, `BootGate`, `GateInput_serial`) plus a
   stub for "Marauder", built with `-DSUICIDE_SAFE_MODE -DGATE_INPUT_SERIAL -DARMING_PIN=27`.
-- **Compiled clean on the first try** — no invented APIs; the agent-written `.cpp` matched the
+- **Compiled clean on the first try** — no invented APIs; the `.cpp` matched the
   headers and the arduino-esp32 / esp-idf / mbedtls surface. App ≈ 296 KB (15 % of the slot).
 
 ## Provision + flash (the real product path)
